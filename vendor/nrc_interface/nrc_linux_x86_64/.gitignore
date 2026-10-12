@@ -1,0 +1,2 @@
+# The deployment adapter needs this vendor binary at runtime.
+!_nrc_host.so

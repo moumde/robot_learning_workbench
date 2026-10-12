@@ -1,0 +1,671 @@
+#!/usr/bin/env python3
+"""
+O6 机械手 Modbus-RTU 控制类 (基于 pymodbus 3.5.1)
+"""
+
+import os
+import time
+from typing import List, Dict, Any # 引入 Any 来表示灵活的输入类型
+import numpy as np
+import logging
+from threading import Lock # 用于线程安全和总线仲裁
+
+# 导入 pymodbus 客户端
+from pymodbus.client import ModbusSerialClient
+from struct import error as StructError 
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="[%(asctime)s] %(levelname)-8s %(message)s",
+    datefmt="%H:%M:%S"
+)
+
+# ------------------------------------------------------------------
+# 读输入寄存器地址枚举（功能码 04，只读）- 按照 O6 协议文档定义
+# ------------------------------------------------------------------
+REG_RD_CURRENT_THUMB_PITCH      = 0   # 大拇指弯曲角度（0-255，小=弯，大=伸）
+REG_RD_CURRENT_THUMB_YAW        = 1   # 大拇指横摆角度（0-255，小=靠掌心，大=远离）
+REG_RD_CURRENT_INDEX_PITCH      = 2   # 食指弯曲角度
+REG_RD_CURRENT_MIDDLE_PITCH     = 3   # 中指弯曲角度
+REG_RD_CURRENT_RING_PITCH       = 4   # 无名指弯曲角度
+REG_RD_CURRENT_LITTLE_PITCH     = 5   # 小拇指弯曲角度
+REG_RD_CURRENT_THUMB_TORQUE     = 6   # 大拇指弯曲转矩（0-255）
+REG_RD_CURRENT_THUMB_YAW_TORQUE = 7   # 大拇指横摆转矩
+REG_RD_CURRENT_INDEX_TORQUE     = 8   # 食指转矩
+REG_RD_CURRENT_MIDDLE_TORQUE    = 9   # 中指转矩
+REG_RD_CURRENT_RING_TORQUE      = 10  # 无名指转矩
+REG_RD_CURRENT_LITTLE_TORQUE    = 11  # 小拇指转矩
+REG_RD_CURRENT_THUMB_SPEED      = 12  # 大拇指弯曲速度（0-255）
+REG_RD_CURRENT_THUMB_YAW_SPEED  = 13  # 大拇指横摆速度
+REG_RD_CURRENT_INDEX_SPEED      = 14  # 食指速度
+REG_RD_CURRENT_MIDDLE_SPEED     = 15  # 中指速度
+REG_RD_CURRENT_RING_SPEED       = 16  # 无名指速度
+REG_RD_CURRENT_LITTLE_SPEED     = 17  # 小拇指速度
+REG_RD_THUMB_TEMP               = 18  # 大拇指弯曲温度（0-70℃）
+REG_RD_THUMB_YAW_TEMP           = 19  # 大拇指横摆温度
+REG_RD_INDEX_TEMP               = 20  # 食指温度
+REG_RD_MIDDLE_TEMP              = 21  # 中指温度
+REG_RD_RING_TEMP                = 22  # 无名指温度
+REG_RD_LITTLE_TEMP              = 23  # 小拇指温度
+REG_RD_THUMB_ERROR              = 24  # 大拇指错误码
+REG_RD_THUMB_YAW_ERROR          = 25  # 大拇指横摆错误码
+REG_RD_INDEX_ERROR              = 26  # 食指错误码
+REG_RD_MIDDLE_ERROR             = 27  # 中指错误码
+REG_RD_RING_ERROR               = 28  # 无名指错误码
+REG_RD_LITTLE_ERROR             = 29  # 小拇指错误码
+
+# 版本号/设备编号寄存器（地址 30-44，共15个寄存器）
+REG_RD_HAND_FREEDOM             = 30  # Hand_freedom - 设备编号 / 自由度（与机械手上标签相同）
+REG_RD_HAND_VERSION             = 31  # hand_version - 手版本
+REG_RD_HAND_NUMBER_HIGH         = 32  # hand_number_高位 - 设备编号（高字节）
+REG_RD_HAND_NUMBER_MID          = 33  # hand_number_中位 - 设备编号（中字节）
+REG_RD_HAND_NUMBER_LOW          = 34  # hand_number_低位 - 设备编号（低字节）
+REG_RD_HAND_DIRECTION           = 35  # hand_direction - 手方向（左/右）
+REG_RD_HARDWARE_VERSION_HIGH    = 36  # hardware_version_高位 - 硬件版本（高字节）
+REG_RD_HARDWARE_VERSION_MID     = 37  # hardware_version_中位 - 硬件版本（中字节）
+REG_RD_HARDWARE_VERSION_LOW     = 38  # hardware_version_低位 - 硬件版本（低字节）
+REG_RD_SOFTWARE_VERSION_HIGH    = 39  # software_version_高位 - 软件版本（高字节）
+REG_RD_SOFTWARE_VERSION_MID     = 40  # software_version_中位 - 软件版本（中字节）
+REG_RD_SOFTWARE_VERSION_LOW     = 41  # software_version_低位 - 软件版本（低字节）
+REG_RD_MECHANICAL_VERSION_HIGH  = 42  # mechanical_version_高位 - 机械版本（高字节）
+REG_RD_MECHANICAL_VERSION_MID   = 43  # mechanical_version_中位 - 机械版本（中字节）
+REG_RD_MECHANICAL_VERSION_LOW   = 44  # mechanical_version_低位 - 机械版本（低字节）
+
+# 力传感器寄存器（地址 45-87+，动态范围）
+REG_RD_PRESSURE_SENSING_ID      = 45  # Pressure_Sensing_ID - 压力传感器ID (0-5)
+REG_RD_PRESSURE_SENSING_SPEC    = 46  # Pressure_Sensing_Specifications - 传感器数据规格
+
+
+# ------------------------------------------------------------------
+# 写保持寄存器地址枚举（功能码 16，读写）- 保持原样
+# ------------------------------------------------------------------
+REG_WR_THUMB_PITCH      = 0   # 大拇指弯曲角度（0-255）
+REG_WR_THUMB_YAW        = 1   # 大拇指横摆角度
+REG_WR_INDEX_PITCH      = 2   # 食指弯曲角度
+REG_WR_MIDDLE_PITCH     = 3   # 中指弯曲角度
+REG_WR_RING_PITCH       = 4   # 无名指弯曲角度
+REG_WR_LITTLE_PITCH     = 5   # 小拇指弯曲角度
+REG_WR_THUMB_TORQUE     = 6   # 大拇指弯曲转矩
+REG_WR_THUMB_YAW_TORQUE = 7   # 大拇指横摆转矩
+REG_WR_INDEX_TORQUE     = 8   # 食指转矩
+REG_WR_MIDDLE_TORQUE    = 9   # 中指转矩
+REG_WR_RING_TORQUE      = 10  # 无名指转矩
+REG_WR_LITTLE_TORQUE    = 11  # 小拇指转矩
+REG_WR_THUMB_SPEED      = 12  # 大拇指弯曲速度
+REG_WR_THUMB_YAW_SPEED  = 13  # 大拇指横摆速度
+REG_WR_INDEX_SPEED      = 14  # 食指速度
+REG_WR_MIDDLE_SPEED     = 15  # 中指速度
+REG_WR_RING_SPEED       = 16  # 无名指速度
+REG_WR_LITTLE_SPEED     = 17  # 小拇指速度
+
+
+class LinkerHandO6RS485:
+    """O6 机械手 Modbus-RTU 控制类，使用 pymodbus 3.5.1"""
+
+    TTL_TIMEOUT = 0.15     # 串口超时
+    FRAME_GAP = 0.030      # 30 ms
+    
+    # KEYS for easy indexing
+    JOINT_KEYS = ["thumb_pitch", "thumb_yaw", "index_pitch", 
+                  "middle_pitch", "ring_pitch", "little_pitch"]
+
+    def __init__(self, hand_id=0x27, modbus_port="/dev/ttyUSB0", baudrate=115200):
+        self._id = hand_id
+        self._last_ts = 0.0  # 上一次帧结束时间
+        self._lock = Lock()  # 总线访问锁
+
+        # 使用 pymodbus 3.x 客户端
+        self.cli = ModbusSerialClient(
+            port=modbus_port,
+            baudrate=baudrate,
+            bytesize=8,
+            parity="N",
+            stopbits=1,
+            timeout=self.TTL_TIMEOUT,
+            handle_local_echo=False
+        )
+
+        try:
+            logging.info(f"Connecting to Modbus RTU on {modbus_port}...")
+            self.connected = self.cli.connect()
+            if not self.connected:
+                raise ConnectionError(f"RS485 connect fail to {modbus_port}")
+            logging.info("Connection successful.")
+        except Exception as e:
+            logging.error(f"Initialization failed: {e}")
+            raise
+
+    # ----------------------------------------------------------
+    # 辅助方法
+    # ----------------------------------------------------------
+    def _bus_free(self):
+        """保证距离上一帧 ≥ 30 ms"""
+        with self._lock:
+            elapse = time.perf_counter() - self._last_ts
+            if elapse < self.FRAME_GAP:
+                time.sleep(self.FRAME_GAP - elapse)
+
+    def _execute_read(self, address: int, count: int) -> List[int]:
+        """执行 Modbus 读取操作 (功能码 04), 带总线仲裁。"""
+        self._bus_free()
+        
+        rsp = self.cli.read_input_registers(
+            address=address, 
+            count=count, 
+            slave=self._id
+        )
+        
+        self._last_ts = time.perf_counter()
+        
+        if rsp.isError():
+            raise RuntimeError(f"Modbus Read Failed (Addr={address}, Count={count}): {rsp}")
+        
+        # 确保返回的值是 Python 原生整数
+        return [int(reg) for reg in rsp.registers]
+
+    def _execute_write(self, address: int, values: List[int]):
+        """执行 Modbus 批量写入操作 (功能码 16), 带总线仲裁。"""
+        self._bus_free()
+        
+        # values 必须是 Python 原生整数列表
+        rsp = self.cli.write_registers(
+            address=address, 
+            values=values, 
+            slave=self._id
+        )
+        
+        self._last_ts = time.perf_counter()
+        
+        if rsp.isError():
+            raise RuntimeError(f"Modbus Write Failed (Addr={address}, Values={values}): {rsp}")
+
+    # ----------------------------------------------------------
+    # 批量读取和数据封装（优化通信效率）
+    # ----------------------------------------------------------
+    def read_all_angles(self) -> List[int]:
+        return self._execute_read(REG_RD_CURRENT_THUMB_PITCH, 6)
+    
+    def read_all_torques(self) -> List[int]:
+        return self._execute_read(REG_RD_CURRENT_THUMB_TORQUE, 6)
+
+    def read_all_speeds(self) -> List[int]:
+        return self._execute_read(REG_RD_CURRENT_THUMB_SPEED, 6)
+    
+    def read_all_temperatures(self) -> List[int]:
+        return self._execute_read(REG_RD_THUMB_TEMP, 6)
+    
+    def read_all_errors(self) -> List[int]:
+        return self._execute_read(REG_RD_THUMB_ERROR, 6)
+
+    # ----------------------------------------------------------
+    # 版本号/设备编号读取（按照协议文档：地址30-44，共15个寄存器）
+    # ----------------------------------------------------------
+    def read_all_versions(self) -> str:
+        """一次性读取全部15个寄存器 (地址30-44)，返回以 '.' 连接的字符串。
+        
+        按 O6 协议文档的版本号格式返回：
+            hand_freedom.hand_version.hand_number_high.hand_number_mid.hand_number_low
+            .hand_direction.hardware_ver_hardware_ver_m.hardware_ver_l
+            .software_ver_h.software_ver_m.software_ver_l
+            .mechanical_ver_h.mechanical_ver_m.mechanical_ver_l
+        
+        例如: "6.1.001.002.003.0.1.2.3.4.5.6.7.8.9"
+        """
+        raw = self._execute_read(REG_RD_HAND_FREEDOM, 15)
+        return ".".join(str(v) for v in raw)
+
+    # ----------------------------------------------------------
+    # 基于 read_all_versions() 的设备编号解析方法
+    # ----------------------------------------------------------
+    def _parse_versions(self):
+        """解析 read_all_versions() 返回的字符串为字典"""
+        parts = self.read_all_versions().split(".")
+        if len(parts) < 15:
+            return {}
+        return {
+            "hand_freedom":      int(parts[0]),
+            "hand_version":      int(parts[1]),
+            "hand_number_high":  int(parts[2]),
+            "hand_number_mid":   int(parts[3]),
+            "hand_number_low":   int(parts[4]),
+            "hand_direction":    int(parts[5]),
+            "hw_ver_high":       int(parts[6]),
+            "hw_ver_mid":        int(parts[7]),
+            "hw_ver_low":        int(parts[8]),
+            "sw_ver_high":       int(parts[9]),
+            "sw_ver_mid":        int(parts[10]),
+            "sw_ver_low":        int(parts[11]),
+            "mech_ver_high":     int(parts[12]),
+            "mech_ver_mid":      int(parts[13]),
+            "mech_ver_low":      int(parts[14]),
+        }
+
+    def get_device_number(self) -> str:
+        """获取设备编号（与机械手上标签相同）。格式：高位+中位+低位 拼接的字符串。"""
+        v = self._parse_versions()
+        if not v:
+            return "0"
+        high, mid, low = v["hand_number_high"], v["hand_number_mid"], v["hand_number_low"]
+        # 将每个字节格式化为无前导零的整数（与标签显示一致）
+        return f"{high}{mid}{low}"
+
+    def get_device_number_value(self) -> int:
+        """获取设备编号数值"""
+        v = self._parse_versions()
+        if not v:
+            return 0
+        high, mid, low = v["hand_number_high"], v["hand_number_mid"], v["hand_number_low"]
+        return high * 65536 + mid * 256 + low
+
+    def get_hardware_version(self) -> str:
+        """获取硬件版本号。格式：高.中.低"""
+        v = self._parse_versions()
+        if not v:
+            return "0.0.0"
+        return f"{v['hw_ver_high']}.{v['hw_ver_mid']}.{v['hw_ver_low']}"
+
+    def get_software_version(self) -> str:
+        """获取软件版本号。格式：高.中.低"""
+        v = self._parse_versions()
+        if not v:
+            return "0.0.0"
+        return f"{v['sw_ver_high']}.{v['sw_ver_mid']}.{v['sw_ver_low']}"
+
+    def get_mechanical_version(self) -> str:
+        """获取机械版本号。格式：高.中.低"""
+        v = self._parse_versions()
+        if not v:
+            return "0.0.0"
+        return f"{v['mech_ver_high']}.{v['mech_ver_mid']}.{v['mech_ver_low']}"
+
+    def get_hand_freedom(self) -> int:
+        """获取自由度（与机械手上标签相同）"""
+        v = self._parse_versions()
+        return v.get("hand_freedom", 0)
+
+    def get_hand_version_raw(self) -> int:
+        """获取手版本原始值"""
+        v = self._parse_versions()
+        return v.get("hand_version", 0)
+
+    def get_hand_direction(self) -> str:
+        """获取手方向，转换为字符：76→'L', 82→'R'"""
+        v = self._parse_versions()
+        val = v.get("hand_direction", 0)
+        if val in (76, 82):
+            return chr(val)
+        # fallback: 直接转为字符（如果值在可打印范围内）
+        return chr(val) if 32 < val < 128 else f'Unknown({val})'
+
+
+    # ----------------------------------------------------------
+    # 只读属性（单个寄存器读取）
+    # ----------------------------------------------------------
+    def _read_reg(self, addr: int) -> int:
+        """读单个输入寄存器（功能码 04），带 30 ms 帧间隔"""
+        return self._execute_read(addr, 1)[0]
+    
+    def get_thumb_pitch(self) -> int:       return self._read_reg(REG_RD_CURRENT_THUMB_PITCH)
+    def get_thumb_yaw(self) -> int:         return self._read_reg(REG_RD_CURRENT_THUMB_YAW)
+    def get_index_pitch(self) -> int:       return self._read_reg(REG_RD_CURRENT_INDEX_PITCH)
+    def get_middle_pitch(self) -> int:      return self._read_reg(REG_RD_CURRENT_MIDDLE_PITCH)
+    def get_ring_pitch(self) -> int:        return self._read_reg(REG_RD_CURRENT_RING_PITCH)
+    def get_little_pitch(self) -> int:      return self._read_reg(REG_RD_CURRENT_LITTLE_PITCH)
+
+    def get_thumb_torque(self) -> int:      return self._read_reg(REG_RD_CURRENT_THUMB_TORQUE)
+    def get_thumb_yaw_torque(self) -> int:  return self._read_reg(REG_RD_CURRENT_THUMB_YAW_TORQUE)
+    def get_index_torque(self) -> int:      return self._read_reg(REG_RD_CURRENT_INDEX_TORQUE)
+    def get_middle_torque(self) -> int:     return self._read_reg(REG_RD_CURRENT_MIDDLE_TORQUE)
+    def get_ring_torque(self) -> int:       return self._read_reg(REG_RD_CURRENT_RING_TORQUE)
+    def get_little_torque(self) -> int:     return self._read_reg(REG_RD_CURRENT_LITTLE_TORQUE)
+
+    def get_thumb_speed(self) -> int:       return self._read_reg(REG_RD_CURRENT_THUMB_SPEED)
+    def get_thumb_yaw_speed(self) -> int:   return self._read_reg(REG_RD_CURRENT_THUMB_YAW_SPEED)
+    def get_index_speed(self) -> int:       return self._read_reg(REG_RD_CURRENT_INDEX_SPEED)
+    def get_middle_speed(self) -> int:      return self._read_reg(REG_RD_CURRENT_MIDDLE_SPEED)
+    def get_ring_speed(self) -> int:        return self._read_reg(REG_RD_CURRENT_RING_SPEED)
+    def get_little_speed(self) -> int:      return self._read_reg(REG_RD_CURRENT_LITTLE_SPEED)
+
+    def get_thumb_temp(self) -> int:        return self._read_reg(REG_RD_THUMB_TEMP)
+    def get_thumb_yaw_temp(self) -> int:    return self._read_reg(REG_RD_THUMB_YAW_TEMP)
+    def get_index_temp(self) -> int:        return self._read_reg(REG_RD_INDEX_TEMP)
+    def get_middle_temp(self) -> int:       return self._read_reg(REG_RD_MIDDLE_TEMP)
+    def get_ring_temp(self) -> int:         return self._read_reg(REG_RD_RING_TEMP)
+    def get_little_temp(self) -> int:       return self._read_reg(REG_RD_LITTLE_TEMP)
+
+    def get_thumb_error(self) -> int:       return self._read_reg(REG_RD_THUMB_ERROR)
+    def get_thumb_yaw_error(self) -> int:   return self._read_reg(REG_RD_THUMB_YAW_ERROR)
+    def get_index_error(self) -> int:       return self._read_reg(REG_RD_INDEX_ERROR)
+    def get_middle_error(self) -> int:      return self._read_reg(REG_RD_MIDDLE_ERROR)
+    def get_ring_error(self) -> int:        return self._read_reg(REG_RD_RING_ERROR)
+    def get_little_error(self) -> int:      return self._read_reg(REG_RD_LITTLE_ERROR)
+
+    
+    # ----------------------------------------------------------
+    # 批量 Getter (使用 read_all_... 方法)
+    # ----------------------------------------------------------
+    def get_state(self) -> List[int]:
+        """获取手指电机状态 (角度)"""
+        return self.read_all_angles()
+
+    def get_torque(self) -> List[int]:
+        """获取当前扭矩"""
+        return self.read_all_torques()
+
+    def get_speed(self) -> List[int]:
+        """获取当前速度"""
+        return self.read_all_speeds()
+
+    def get_temperature(self) -> List[int]:
+        """获取当前电机温度"""
+        return self.read_all_temperatures()
+    
+    def get_fault(self) -> List[int]:
+        """获取当前电机故障码"""
+        return self.read_all_errors()
+    
+    def get_version(self) -> str:
+        """获取当前固件版本号（已转换为字符串格式）"""
+        return self.read_all_versions()
+
+
+    # ----------------------------------------------------------
+    # 写保持寄存器 (单个寄存器写入)
+    # ----------------------------------------------------------
+    def _write_reg(self, addr: int, value: int):
+        """写单个保持寄存器（功能码 16），带 30 ms 帧间隔"""
+        if not 0 <= value <= 255:
+            raise ValueError("value must be 0-255")
+        
+        # 确保 value 是 Python 原生 int
+        self._execute_write(addr, [int(value)])
+
+    def _write_regs(self, addr: int, values: List[int]):
+        """写多个保持寄存器（功能码 16），带 30 ms 帧间隔"""
+        # 此时 values 应该已经是经过 is_valid_6xuint8 验证并转换的 Python int 列表
+        if not all(0 <= v <= 255 for v in values):
+            # 这行理论上不应触发，因为上层调用已校验
+            raise ValueError("All values must be 0-255")
+        self._execute_write(addr, values)
+
+
+    def set_thumb_pitch(self, v: int):           self._write_reg(REG_WR_THUMB_PITCH, v)
+    def set_thumb_yaw(self, v: int):             self._write_reg(REG_WR_THUMB_YAW, v)
+    def set_index_pitch(self, v: int):           self._write_reg(REG_WR_INDEX_PITCH, v)
+    def set_middle_pitch(self, v: int):          self._write_reg(REG_WR_MIDDLE_PITCH, v)
+    def set_ring_pitch(self, v: int):            self._write_reg(REG_WR_RING_PITCH, v)
+    def set_little_pitch(self, v: int):          self._write_reg(REG_WR_LITTLE_PITCH, v)
+
+    def set_thumb_torque(self, v: int):          self._write_reg(REG_WR_THUMB_TORQUE, v)
+    def set_thumb_yaw_torque(self, v: int):      self._write_reg(REG_WR_THUMB_YAW_TORQUE, v)
+    def set_index_torque(self, v: int):          self._write_reg(REG_WR_INDEX_TORQUE, v)
+    def set_middle_torque(self, v: int):         self._write_reg(REG_WR_MIDDLE_TORQUE, v)
+    def set_ring_torque(self, v: int):           self._write_reg(REG_WR_RING_TORQUE, v)
+    def set_little_torque(self, v: int):         self._write_reg(REG_WR_LITTLE_TORQUE, v)
+
+    def set_thumb_speed(self, v: int):           self._write_reg(REG_WR_THUMB_SPEED, v)
+    def set_thumb_yaw_speed(self, v: int):       self._write_reg(REG_WR_THUMB_YAW_SPEED, v)
+    def set_index_speed(self, v: int):           self._write_reg(REG_WR_INDEX_SPEED, v)
+    def set_middle_speed(self, v: int):          self._write_reg(REG_WR_MIDDLE_SPEED, v)
+    def set_ring_speed(self, v: int):            self._write_reg(REG_WR_RING_SPEED, v)
+    def set_little_speed(self, v: int):          self._write_reg(REG_WR_LITTLE_SPEED, v)
+
+    # ----------------------------------------------------------
+    # 固定函数 (采用批量写入优化)
+    # ----------------------------------------------------------
+    def is_valid_6xuint8(self, lst: List[Any]) -> bool:
+        """
+        验证6个0-255的整数列表。
+        允许输入包含浮点数、NumPy整数等可转换为 int 的类型，并进行范围校验。
+        """
+        if not (isinstance(lst, list) and len(lst) == 6):
+            return False
+            
+        try:
+            # 关键：尝试将所有元素转换为 Python 原生 int
+            int_values = [int(v) for v in lst]
+        except (ValueError, TypeError):
+            # 转换失败，列表中包含不可转换的元素
+            return False
+
+        # 校验转换后的整数列表是否在 0-255 范围内
+        return all(0 <= x <= 255 for x in int_values)
+    
+    def set_joint_positions(self, joint_angles: List[Any] = None):
+        joint_angles = joint_angles or [0] * 6
+        
+        if not self.is_valid_6xuint8(joint_angles):
+            logging.error(f"Invalid joint angles received: {joint_angles}")
+            raise ValueError("Joint angles must be a list of 6 values between 0 and 255 (convertible to int).")
+
+        # 强制转换为 Modbus 兼容的 Python 原生 int 列表
+        int_angles = [int(v) for v in joint_angles] 
+        
+        # 批量写入 6 个角度寄存器 (从 REG_WR_THUMB_PITCH 地址 0 开始, count=6)
+        self._write_regs(REG_WR_THUMB_PITCH, int_angles)
+
+    def set_speed(self, speed: List[Any] = None):
+        speed = speed or [200] * 6
+        if not self.is_valid_6xuint8(speed):
+            logging.error(f"Invalid speed values received: {speed}")
+            raise ValueError("Speed values must be a list of 6 values between 0 and 255 (convertible to int).")
+        
+        int_speed = [int(v) for v in speed]
+        self._write_regs(REG_WR_THUMB_SPEED, int_speed)
+    
+    def set_torque(self, torque: List[Any] = None):
+        torque = torque or [200] * 6
+        if not self.is_valid_6xuint8(torque):
+            logging.error(f"Invalid torque values received: {torque}")
+            raise ValueError("Torque values must be a list of 6 values between 0 and 255 (convertible to int).")
+            
+        int_torque = [int(v) for v in torque]
+        self._write_regs(REG_WR_THUMB_TORQUE, int_torque)
+
+    # ... (其他固定函数保持不变) ...
+
+    def set_current(self, current: List[int] = None):
+        print("当前O6不支持设置电流", flush=True)
+        pass
+
+    def get_state_for_pub(self) -> list:
+        return self.get_state()
+
+    def get_current_status(self) -> list:
+        return self.get_state()
+    
+    def get_joint_speed(self) -> list:
+        return self.get_speed()
+    
+    def get_touch_type(self) -> list:
+        return -1
+    
+    def get_normal_force(self) -> list:
+        return [-1] * 5
+    
+    def get_tangential_force(self) -> list:
+        return [-1] * 5
+    
+    def get_approach_inc(self) -> list:
+        return [-1] * 5
+    
+    def get_touch(self) -> list:
+        return [-1] * 5
+    
+    def _pressure(self, finger: int) -> np.ndarray:
+        """
+        读取压力传感器数据 (10x4矩阵)
+        """
+        rows = 10      # 10行
+        cols = 4       # 4列
+        finger_size = rows * cols  # 40个数据点
+        
+        # modbus 地址 (按O6协议文档)
+        write_address = 18   # 写入手指选择 (保持寄存器)
+        read_address = 47    # 读取压力数据 (输入寄存器)
+        read_count = 40      # 读取40个寄存器
+        
+        # 0. 参数校验
+        if finger < 1 or finger > 5:
+            raise ValueError(f"无效的手指编号: {finger}。手指编号应在 1 到 5 之间。")
+        
+        # 1. 写入手指选择寄存器 (地址18)
+        time.sleep(0.01)
+        self._write_reg(write_address, finger)
+        
+        # 2. 读取压力数据
+        data = self._execute_read(read_address, read_count)
+        
+        # 3. 转换为numpy数组并重塑为10x4矩阵
+        finger_matrix = np.array(data, dtype=np.uint8).reshape((rows, cols))
+        
+        return finger_matrix
+    
+    def get_thumb_matrix_touch(self,sleep_time=0):
+        return np.array(self._pressure(1), dtype=np.uint8)
+
+
+    def get_index_matrix_touch(self,sleep_time=0):
+        return np.array(self._pressure(2), dtype=np.uint8)
+
+    def get_middle_matrix_touch(self,sleep_time=0):
+        return np.array(self._pressure(3), dtype=np.uint8)
+
+    def get_ring_matrix_touch(self,sleep_time=0):
+        return np.array(self._pressure(4), dtype=np.uint8)
+
+    def get_little_matrix_touch(self,sleep_time=0):
+        return np.array(self._pressure(5), dtype=np.uint8)
+
+    def get_matrix_touch(self) -> list:
+        thumb_matrix = np.full((12, 6), -1)
+        index_matrix = np.full((12, 6), -1)
+        middle_matrix = np.full((12, 6), -1)
+        ring_matrix = np.full((12, 6), -1)
+        little_matrix = np.full((12, 6), -1)
+        return thumb_matrix , index_matrix , middle_matrix , ring_matrix , little_matrix
+    
+    def get_serial_number(self):
+
+        return "["+str(self.get_hand_freedom())+"-"+str(self.get_mechanical_version())+"-"+str(self.get_device_number())+"-"+str(self.get_hand_direction())+"]"
+
+    def get_matrix_touch_v2(self) -> list:
+        return self.get_matrix_touch()
+
+    def get_finger_order(self):
+        return ["thumb_cmc_pitch", "thumb_cmc_yaw", "index_mcp_pitch", "middle_mcp_pitch", "ring_mcp_pitch", "pinky_mcp_pitch"]
+    
+    def clear_faults(self):
+        pass
+    
+    def close(self):
+        if hasattr(self, 'connected') and self.connected:
+            self.cli.close()
+            self.connected = False
+            logging.info("Modbus connection closed.")
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.close()
+
+    # ----------------------------------------------------------
+    # 便捷函数
+    # ----------------------------------------------------------
+    def set_all_fingers(self, pitch: int):
+        """同时设置五指弯曲角度（0-255），使用批量写入"""
+        # 允许传入 float/numpy int 等可转换为 int 的类型
+        try:
+            pitch_int = int(pitch)
+        except (ValueError, TypeError):
+             raise ValueError("Pitch value must be a number convertible to int (0-255)")
+
+        if not 0 <= pitch_int <= 255:
+            raise ValueError("Pitch value must be 0-255")
+        
+        # 批量设置所有 6 个关节的角度
+        self.set_joint_positions([pitch_int] * 6)
+
+    def relax(self):
+        """全部手指伸直（255）"""
+        self.set_all_fingers(255)
+
+    def fist(self):
+        """全部手指弯曲（0）"""
+        self.set_all_fingers(0)
+
+    def dump_status(self):
+        """打印当前所有可读状态 (使用批量读取优化)"""
+        print("--------- O6 Hand Status ---------")
+        
+        angles = self.get_state()
+        temps = self.get_temperature()
+        errors = self.get_fault()
+        
+        # 解析版本号字符串
+        v = self._parse_versions()
+
+        if v:
+            device_num_str = f"{v['hand_number_high']}{v['hand_number_mid']}{v['hand_number_low']}"
+            hw_ver = f"{v['hw_ver_high']}.{v['hw_ver_mid']}.{v['hw_ver_low']}"
+            sw_ver = f"{v['sw_ver_high']}.{v['sw_ver_mid']}.{v['sw_ver_low']}"
+            mech_ver = f"{v['mech_ver_high']}.{v['mech_ver_mid']}.{v['mech_ver_low']}"
+            
+            print(f"Device Number:   {device_num_str}")
+            print(f"HWSW Version:    HW={hw_ver} SW={sw_ver}")
+            print(f"Mechanical Ver:  {mech_ver}")
+            print(f"Hand Freedom:    {v['hand_freedom']}")
+            print(f"Full Version:    {self.read_all_versions()}")
+
+        print(f"Joint Angles:    {angles}")
+        print(f"Temperature:     {temps}℃")
+        print(f"Error Codes:     {errors}")
+        print("----------------------------------")
+
+
+# ------------------------------------------------------------------
+# 命令行快速测试
+# ------------------------------------------------------------------
+if __name__ == "__main__":
+    import argparse
+    
+    # 假设默认站号是 0x27 (39)
+    DEFAULT_HAND_ID = 0x27
+
+    parser = argparse.ArgumentParser(description="O6 Hand Modbus tester (using pymodbus 3.5.1)")
+    parser.add_argument("-p", "--port", required=True, help="串口, 如 /dev/ttyUSB0")
+    parser.add_argument("-l", "--left", action="store_const", const=0x28, default=DEFAULT_HAND_ID, dest='hand_id', help="左手 (0x28)，默认右手 (0x27)")
+    
+    args = parser.parse_args()
+
+    try:
+        # 使用 with 语句确保连接关闭，这是 pymodbus 的推荐用法
+        with LinkerHandO6RS485(hand_id=args.hand_id, modbus_port=args.port, baudrate=115200) as hand:
+            hand.dump_status()
+
+            # 测试新增的设备编号读取方法
+            print("\n--- 设备信息 ---")
+            print(f"设备编号（字符串）: {hand.get_device_number()}")
+            print(f"设备编号（数值）:   {hand.get_device_number_value()}")
+            print(f"硬件版本号:         {hand.get_hardware_version()}")
+            print(f"软件版本号:         {hand.get_software_version()}")
+            print(f"机械版本号:         {hand.get_mechanical_version()}")
+
+            print("\n执行 relax → 伸直")
+            hand.relax()
+            time.sleep(1)
+            print("执行 fist → 握拳")
+            hand.fist()
+            time.sleep(1)
+            hand.relax()
+            print("演示完成")
+            
+    except ConnectionError as e:
+        print(f"连接错误: {e}")
+    except RuntimeError as e:
+        print(f"Modbus 运行时错误: {e}")
+    except StructError as e:
+        print(f"数据结构错误 (请检查输入数据类型是否为原生int): {e}")
+    except Exception as e:
+        print(f"发生其他错误: {e}")
