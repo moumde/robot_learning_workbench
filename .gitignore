@@ -1,0 +1,33 @@
+# Python caches / environments
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.venv/
+**/.venv/
+.env
+.env.*
+!.env.example
+
+# IDE / OS
+.vscode/
+.idea/
+.DS_Store
+*.swp
+
+# Local data and model artifacts (do not commit large files)
+dataset/train/*
+!dataset/train/.gitkeep
+dataset/replay/*
+!dataset/replay/.gitkeep
+checkpoints/*
+!checkpoints/.gitkeep
+logs/*
+!logs/.gitkeep
+
+# Runtime outputs
+*.log
+*.pid
+
+# OpenPI checkout's own runtime files are ignored by its own .gitignore;
+# keep the OpenPI submodule gitlink tracked by the parent repo.
