@@ -69,17 +69,11 @@ hand_kwargs = hardware.hand.api_kwargs()
 
 ### 2.1 获取代码
 
-维护者创建团队仓库后，其他开发者使用递归克隆：
+维护者创建团队仓库后，其他开发者直接克隆项目：
 
 ```bash
-git clone --recurse-submodules <团队仓库 SSH 或 HTTPS 地址> robot_learning_workbench
+git clone <团队仓库 SSH 或 HTTPS 地址> robot_learning_workbench
 cd robot_learning_workbench
-```
-
-如果已经普通克隆过仓库：
-
-```bash
-git submodule update --init --recursive
 ```
 
 ### 2.2 安装系统工具和 uv
@@ -106,7 +100,7 @@ uv --version
 ./scripts/bootstrap.sh
 ```
 
-该脚本会初始化 Submodule、根据 OpenPI 的 `pyproject.toml` 和 `uv.lock` 创建 `module/openpi/.venv/`，然后检查以下模块是否可以导入：
+该脚本会根据项目内 OpenPI 的 `pyproject.toml` 和 `uv.lock` 创建 `module/openpi/.venv/`，然后检查以下模块是否可以导入：
 
 - `openpi`
 - `lerobot`
@@ -174,7 +168,7 @@ nvidia-smi
 
 ### 3.2 训练
 
-训练配置和参数以当前固定的 OpenPI Submodule 为准：
+训练配置和参数以项目内 `module/openpi/` 的 OpenPI 源码为准：
 
 ```bash
 ./scripts/run_openpi.sh scripts/train.py \
@@ -315,12 +309,12 @@ robot_learning_workbench/
 ├── teleop/                 # 遥操功能
 ├── hmi/                    # 数据采集、训练和部署界面
 ├── module/
-│   ├── openpi/             # OpenPI Git Submodule
+│   ├── openpi/             # OpenPI 源码，由本项目直接管理
 │   │   └── src/openpi/policies/
 │   │                       # OpenPI 策略与机器人动作/观测适配
 │   └── nrc/                # NRC 独立环境目录，不提交 .venv
 ├── core/                   # 工作台核心业务逻辑
-├── configs/                # 训练任务/业务配置
+├── tasks/                  # 训练任务、业务流程和部署任务定义
 ├── test/                   # 接口、相机和硬件测试
 ├── dataset/
 │   ├── train/              # 训练数据，不进 Git
@@ -337,9 +331,8 @@ OpenPI 源码只维护在 `module/openpi/`，不要复制到工作台其他目�
 
 | 脚本 | 用途 |
 | --- | --- |
-| `scripts/add_openpi_submodule.sh` | 由维护者首次添加官方 OpenPI Submodule |
 | `scripts/install_system_deps_ubuntu.sh` | 安装 Ubuntu/Debian 系统工具和基础库 |
-| `scripts/bootstrap.sh` | 初始化 Submodule、创建并验证 OpenPI 环境 |
+| `scripts/bootstrap.sh` | 创建并验证 OpenPI 环境 |
 | `scripts/setup_openpi_env.sh` | 按 OpenPI 锁文件安装 `module/openpi/.venv/` |
 | `scripts/verify_openpi_env.sh` | 检查 OpenPI、LeRobot、JAX、Torch、OpenCV 和 GPU |
 | `scripts/run_openpi.sh` | 在 OpenPI 3.11 环境和 OpenPI 工作目录中运行命令 |
@@ -350,9 +343,9 @@ OpenPI 源码只维护在 `module/openpi/`，不要复制到工作台其他目�
 
 ## 7. 协同开发规则
 
-### 7.1 OpenPI 版本由父仓库固定
+### 7.1 OpenPI 代码由本项目管理
 
-如果这是一个刚创建的工作台模板，维护者先初始化父仓库并推送团队远程：
+OpenPI 源码已经完整放在 `module/openpi/` 下，并作为本项目普通文件提交。其他成员只需同步工作台仓库：
 
 ```bash
 git init -b main
@@ -362,22 +355,11 @@ git remote add origin <团队仓库 SSH 或 HTTPS 地址>
 git push -u origin main
 ```
 
-维护者首次添加 OpenPI：
-
-```bash
-./scripts/add_openpi_submodule.sh
-git add .gitmodules module/openpi
-git commit -m "build: pin OpenPI submodule revision"
-```
-
-其他成员同步固定版本：
-
 ```bash
 git pull --ff-only
-git submodule update --init --recursive
 ```
 
-不要由每个开发者自行执行 `git submodule update --remote`。本项目对 `module/openpi/` 的 CR3/O6 配置和策略修改仅用于当前工作台，不会自动提交或推送到 OpenPI 上游项目。重新初始化或切换子模块版本时，需要确认这些项目专用修改是否需要保留。
+`module/openpi/` 下的 CR3/O6 配置和策略修改属于本项目代码，不会自动提交或推送到 OpenPI 上游项目。更新 OpenPI 版本时，由维护者在本项目中统一替换和验证。
 
 ### 7.2 依赖变更需要可复现
 
@@ -410,30 +392,21 @@ git diff --check
 
 ```bash
 git pull --ff-only
-git submodule update --init --recursive
 ```
 
 通常不需要每次重新安装环境。只有以下情况才运行相应脚本：
 
 - OpenPI 的 `pyproject.toml` 或 `uv.lock` 发生变化：运行 `./scripts/setup_openpi_env.sh`；
 - NRC 客户端依赖或 Python 版本发生变化：运行 `./scripts/setup_nrc_env.sh`；
-- OpenPI Submodule 指向发生变化：同步后重新运行 `./scripts/verify_openpi_env.sh`。
+- `module/openpi/` 源码发生变化：同步后按需重新运行 `./scripts/setup_openpi_env.sh` 和 `./scripts/verify_openpi_env.sh`。
 
-更新 OpenPI 前，维护者应先在独立分支中完成环境、导入和关键流程验证，再提交新的 Submodule 指针。
+更新 OpenPI 前，维护者应先在独立分支中完成环境、导入和关键流程验证。
 
 ## 9. 常见问题
 
-### OpenPI Submodule 缺失
+### `module/openpi` 源码缺失
 
-```bash
-git submodule update --init --recursive
-```
-
-如果工作台尚未登记 OpenPI，先由维护者运行：
-
-```bash
-./scripts/add_openpi_submodule.sh
-```
+请确认项目克隆完整，并检查 `module/openpi/pyproject.toml` 是否存在。
 
 ### `run_openpi.sh` 找不到环境
 

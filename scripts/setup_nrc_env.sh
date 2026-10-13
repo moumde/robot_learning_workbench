@@ -9,7 +9,7 @@ NRC_PYTHON_VERSION="${NRC_PYTHON_VERSION:-3.12}"
 
 if [[ ! -f "$OPENPI_ROOT/packages/openpi-client/pyproject.toml" ]]; then
   echo "ERROR: OpenPI client package is missing: $OPENPI_ROOT/packages/openpi-client" >&2
-  echo "Run ./scripts/add_openpi_submodule.sh first." >&2
+  echo "确认 module/openpi 源码目录完整后再重试。" >&2
   exit 1
 fi
 if ! command -v uv >/dev/null 2>&1; then

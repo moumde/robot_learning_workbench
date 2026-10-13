@@ -33,5 +33,5 @@ logs/*
 *.log
 *.pid
 
-# OpenPI checkout's own runtime files are ignored by its own .gitignore;
-# keep the OpenPI submodule gitlink tracked by the parent repo.
+# OpenPI runtime files and caches remain ignored; OpenPI source is tracked by
+# this repository as a regular directory.

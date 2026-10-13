@@ -8,10 +8,9 @@ if ! command -v uv >/dev/null 2>&1; then
   exit 1
 fi
 if [[ ! -f "$ROOT/module/openpi/pyproject.toml" ]]; then
-  echo "ERROR: 缺少 OpenPI Submodule。请先由维护者添加并提交，再重新 clone --recurse-submodules。" >&2
+  echo "ERROR: 缺少 module/openpi 源码目录。请确认仓库内容完整。" >&2
   exit 1
 fi
 
-git -C "$ROOT" submodule update --init --recursive
 "$ROOT/scripts/setup_openpi_env.sh"
 "$ROOT/scripts/verify_openpi_env.sh"

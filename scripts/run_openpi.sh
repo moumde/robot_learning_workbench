@@ -5,7 +5,7 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 OPENPI_ROOT="$ROOT/module/openpi"
 
 if [[ ! -f "$OPENPI_ROOT/pyproject.toml" ]]; then
-  echo "ERROR: OpenPI submodule is missing. Run ./scripts/add_openpi_submodule.sh first." >&2
+  echo "ERROR: module/openpi 源码目录缺失。请确认仓库内容完整。" >&2
   exit 1
 fi
 if [[ ! -x "$OPENPI_ROOT/.venv/bin/python" ]]; then
