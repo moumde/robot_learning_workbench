@@ -87,6 +87,27 @@ def _patch_pymodbus_slave_argument() -> None:
 
 
 def _load_hand_api():
+    # The workbench and LinkerHand SDK both use a top-level ``core`` package.
+    # Once ``core.openpi`` has been imported, appending the SDK's LinkerHand
+    # directory to sys.path is not enough: the already-loaded namespace package
+    # keeps its original search path. Extend it so ``core.rs485`` / ``core.can``
+    # from the vendored SDK remain importable.
+    sdk_core_root = LINKERHAND_SDK_ROOT / "LinkerHand" / "core"
+    if not sdk_core_root.is_dir():
+        raise RuntimeError(f"LinkerHand SDK core directory is missing: {sdk_core_root}")
+    try:
+        import core
+    except ImportError as exc:
+        raise RuntimeError("Could not resolve the workbench 'core' package") from exc
+    core_paths = getattr(core, "__path__", None)
+    if core_paths is None:
+        raise RuntimeError(
+            "The imported 'core' module is not a package; cannot expose LinkerHand drivers"
+        )
+    sdk_core_path = str(sdk_core_root)
+    if sdk_core_path not in core_paths:
+        core_paths.append(sdk_core_path)
+
     try:
         from LinkerHand.linker_hand_api import LinkerHandApi
     except ImportError as exc:
@@ -384,6 +405,8 @@ def main() -> int:
     controller: ActionChunkController | None = None
     servo_opened = False
     powered_by_client = False
+    exit_code = 0
+    cleanup_failed = False
     try:
         LOGGER.info("Connecting CR3 %s from %s", hardware.nrc.ip, hardware.source)
         robot.connect()
@@ -433,29 +456,30 @@ def main() -> int:
             initial_actions=warmup,
         )
         controller.run(args.duration_s or None)
-        return 0
     except KeyboardInterrupt:
         LOGGER.info("Deployment stopped by user")
-        return 0
     except Exception as exc:
         LOGGER.exception("Deployment failed: %s", exc)
-        return 1
+        exit_code = 1
     finally:
         if controller is not None:
             try:
                 controller.stop()
             except Exception:
                 LOGGER.exception("Failed to stop policy controller")
+                cleanup_failed = True
         if servo_opened:
             try:
                 _move_to_initial_position(robot, hand_api, args.initial_move_duration_s,
                                           args.max_joint_speed_rad_s)
             except Exception:
                 LOGGER.exception("Failed to return CR3/O6 to the initial position")
+                cleanup_failed = True
             try:
                 robot.close_servoj()
             except Exception:
                 LOGGER.exception("Failed to close CR3 ServoJ")
+                cleanup_failed = True
         cameras.disconnect()
         if hand_api is not None:
             _close_hand(hand_api)
@@ -464,7 +488,13 @@ def main() -> int:
                 robot.power_off()
             except Exception:
                 LOGGER.exception("Failed to power off CR3")
+                cleanup_failed = True
         robot.disconnect()
+        if cleanup_failed and exit_code == 0:
+            LOGGER.error("Policy task cleanup failed; stopping the remaining workflow for safety")
+            exit_code = 1
+
+    return exit_code
 
 
 if __name__ == "__main__":

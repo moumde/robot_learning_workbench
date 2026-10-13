@@ -242,6 +242,46 @@ uv pip install --python module/nrc/.venv/bin/python \
 
 若用 `--config` 指定另一份硬件 TOML，手和相机连接参数也会从该文件读取。
 
+### 3.5 回放已采集的 CR3/O6 轨迹
+
+回放程序位于 `core/openpi/cr3_o6/replay_trajectory.py`，默认读取 `dataset/replay/teleop_once` 中的 LeRobot parquet episode。`--preview-only` 只解析并汇报轨迹，不连接硬件：
+
+```bash
+./scripts/run_nrc.sh python core/openpi/cr3_o6/replay_trajectory.py \
+  --preview-only --episode-index 0
+```
+
+确认数据、初始位置和现场安全后，才显式启用真实回放：
+
+```bash
+./scripts/run_nrc.sh python core/openpi/cr3_o6/replay_trajectory.py \
+  --confirm-motion --episode-index 0 --time-scale 1.0
+```
+
+程序按 parquet 中的 `timestamp` 控制回放节奏，默认限制 CR3 目标变化速度，并在开始时先回到脚本中的初始位置，再平滑移动到轨迹首帧；结束后会返回初始位置。可用 `--data-dir` 选择其他 `dataset/replay/` 子目录、`--config` 选择硬件 profile、`--repeat` 重复次数和 `--time-scale` 调整播放速度。回放不启动策略服务器，也不读取相机。
+
+要播放数据集中的全部轨迹，可先无运动预览，再显式启用运动：
+
+```bash
+./scripts/run_nrc.sh python core/openpi/cr3_o6/replay_trajectory.py \
+  --preview-only --all-episodes --repeat 1
+./scripts/run_nrc.sh python core/openpi/cr3_o6/replay_trajectory.py \
+  --confirm-motion --all-episodes --repeat 1
+```
+
+完整数据集模式按 episode 编号顺序播放，并在轨迹之间平滑移动到下一条的首帧；`--repeat` 控制整套轨迹序列重复几遍。从界面选择数据集时使用同样的顺序和次数语义。不加 `--all-episodes` 时，仍可用 `--episode-index` 只播放单条轨迹。
+
+### 3.6 Qt 操作界面
+
+安装/更新 NRC 环境（包含 PySide6）后启动桌面界面：
+
+```bash
+./scripts/setup_nrc_env.sh
+./scripts/run_deloy_hmi.sh
+```
+
+界面可选择硬件 profile 和 checkpoint，启动/停止 PI05 服务，并创建、排序、预览和执行推理/轨迹重播任务；任务流可保存或读取 `tasks/` 下的 JSON 配置。整条序列由一个工作流进程持有硬件连接与 ServoJ；每一遍数据集重播前先回初始位姿，再限速过渡到首条轨迹。整套任务结束后才统一清理。若控制器进入错误态，后续任务会停止；启动前若已处于错误态，程序不会自动清错或上电。推理任务需设置最长时长，当前策略没有语义任务完成信号。
+
 ## 4. 硬件测试
 
 ### 4.1 NRC 机械臂接口测试
@@ -332,7 +372,7 @@ robot_learning_workbench/
 │   │                       # OpenPI 策略与机器人动作/观测适配
 │   └── nrc/                # NRC 独立环境目录，不提交 .venv
 ├── core/                   # 工作台核心业务逻辑
-│   └── openpi/cr3_o6/      # CR3/O6 的 OpenPI 部署客户端业务
+│   └── openpi/cr3_o6/      # CR3/O6 策略部署与轨迹回放业务
 ├── tasks/                  # 训练任务、业务流程和部署任务定义
 ├── test/                   # 接口、相机和硬件测试
 ├── dataset/
@@ -357,6 +397,7 @@ OpenPI 源码只维护在 `module/openpi/`，不要复制到工作台其他目�
 | `scripts/run_openpi.sh` | 在 OpenPI 3.11 环境和 OpenPI 工作目录中运行命令 |
 | `scripts/setup_nrc_env.sh` | 创建独立的 Python 3.12 NRC 客户端环境 |
 | `scripts/run_nrc.sh` | 在 NRC 环境、仓库根目录中运行命令 |
+| `scripts/run_deloy_hmi.sh` | 启动推理部署用 PySide6 界面 |
 
 日常运行 Python 程序时，优先使用对应的启动脚本，不要直接调用系统 `python`。这可以避免 Python 版本、当前工作目录和动态库搜索路径不一致。
 

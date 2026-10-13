@@ -23,13 +23,16 @@ uv venv --python "$NRC_PYTHON_VERSION" "$NRC_ENV"
 
 # The client does not need the full OpenPI training stack.  Keep this
 # environment independent from module/openpi/.venv while installing the
-# network client and the RS485 dependencies used by the LinkerHand SDK.
+# network client, LinkerHand dependencies, and parquet reader for trajectory replay.
 uv pip install \
   --python "$NRC_ENV/bin/python" \
   -e "$OPENPI_ROOT/packages/openpi-client" \
   pymodbus==3.5.1 \
   pyserial \
-  PyYAML
+  PyYAML \
+  pandas \
+  pyarrow \
+  PySide6
 
 echo
 echo "NRC environment is ready: $NRC_ENV"

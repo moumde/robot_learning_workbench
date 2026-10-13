@@ -9,9 +9,10 @@ __pycache__/
 .env.*
 !.env.example
 
-# Local hardware overrides (the checked-in baseline is config/hardware.toml)
+# Local hardware overrides; shared hardware profiles are stored under config/hardware/.
 config/hardware.local.toml
 config/*.local.toml
+config/hardware/*.local.toml
 
 # IDE / OS
 .vscode/

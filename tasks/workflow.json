@@ -1,0 +1,18 @@
+{
+  "version": 1,
+  "tasks": [
+    {
+      "type": "policy",
+      "description": "PI05 推理 · 25s",
+      "prompt": "Pick up the motor and place it on the right side with the protruding side facing left.",
+      "duration_s": 25.0
+    },
+    {
+      "type": "replay",
+      "description": "重播 · teleop_once · 1 条轨迹 × 1 遍",
+      "dataset_dir": "dataset/replay/teleop_once",
+      "repeat_count": 1,
+      "time_scale": 1.0
+    }
+  ]
+}
