@@ -70,12 +70,18 @@ def _discover_policy_checkpoints(checkpoints_dir: Path = CHECKPOINTS_DIR) -> dic
         if not candidates:
             continue
 
-        def checkpoint_key(path: Path) -> tuple[tuple[int, ...], str]:
-            relative = path.relative_to(policy_dir.resolve())
-            steps = tuple(int(part) for part in relative.parts if part.isdigit())
-            return steps, relative.as_posix()
-
-        policies[policy_dir.name] = max(candidates, key=checkpoint_key)
+        numeric_candidates = [path for path in candidates if path.name.isdecimal()]
+        if numeric_candidates:
+            # Checkpoint steps are directory names such as 90000 and 100000;
+            # compare them numerically so 100000 correctly sorts after 90000.
+            policies[policy_dir.name] = max(
+                numeric_candidates,
+                key=lambda path: (int(path.name), path.as_posix()),
+            )
+        else:
+            # Keep non-step layouts discoverable, though numbered checkpoints
+            # are preferred whenever they exist.
+            policies[policy_dir.name] = max(candidates, key=lambda path: path.as_posix())
     return policies
 
 
