@@ -187,6 +187,29 @@ nvidia-smi
 module/openpi/src/openpi/training/config.py
 ```
 
+当前基线已经迁移了 Dobot CR3 + LinkerHand O6 的 Pi05 LoRA 配置：
+
+```bash
+./scripts/run_openpi.sh scripts/train.py \
+  pi05_cr3_o6_lora --exp-name=pi05_cr3_o6_lora
+```
+
+该配置使用 `module/openpi/src/openpi/policies/cr3_o6_policy.py` 完成三路图像、12 维状态/动作与 Pi05 32 维动作头之间的适配：输入数据使用 12 维动作，模型内部补齐到 32 维，推理输出再裁剪回 12 维。训练前需要准备 LeRobot 数据集 `local/data_v21`，并让它位于 `HF_LEROBOT_HOME/local/data_v21`；也可以将配置中的 `repo_id` 改为团队实际使用的 Hugging Face 数据集 ID。数据字段应包含：
+
+- `observation.images.base_0_rgb`
+- `observation.images.left_wrist_0_rgb`
+- `observation.images.right_wrist_0_rgb`
+- `observation.state`（12 维）
+- `action`（12 维）
+
+其中基座相机必须存在；策略变换层对缺失的腕部相机会使用黑图和无效 mask，但数据集的 repack 字段仍应与上述命名保持一致。首次准备数据时，可先计算归一化统计量：
+
+```bash
+./scripts/run_openpi.sh scripts/compute_norm_stats.py pi05_cr3_o6_lora
+```
+
+默认统计文件会写入 `module/openpi/assets/pi05_cr3_o6_lora/local/data_v21/`。如果团队使用其他数据集 ID，应同步修改配置中的 `repo_id`，并重新计算统计量。
+
 ### 3.3 启动模型服务端
 
 模型服务端应使用 OpenPI 环境。当前基线不强行规定唯一的服务端入口，接入具体服务程序后按实际文件运行：
@@ -293,6 +316,8 @@ robot_learning_workbench/
 ├── hmi/                    # 数据采集、训练和部署界面
 ├── module/
 │   ├── openpi/             # OpenPI Git Submodule
+│   │   └── src/openpi/policies/
+│   │                       # OpenPI 策略与机器人动作/观测适配
 │   └── nrc/                # NRC 独立环境目录，不提交 .venv
 ├── core/                   # 工作台核心业务逻辑
 ├── configs/                # 训练任务/业务配置
@@ -352,7 +377,7 @@ git pull --ff-only
 git submodule update --init --recursive
 ```
 
-不要由每个开发者自行执行 `git submodule update --remote`。如果团队需要修改 OpenPI，建议维护团队 Fork，并在经过验证后统一更新父仓库中的 Submodule commit。
+不要由每个开发者自行执行 `git submodule update --remote`。本项目对 `module/openpi/` 的 CR3/O6 配置和策略修改仅用于当前工作台，不会自动提交或推送到 OpenPI 上游项目。重新初始化或切换子模块版本时，需要确认这些项目专用修改是否需要保留。
 
 ### 7.2 依赖变更需要可复现
 
