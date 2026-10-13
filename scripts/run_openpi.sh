@@ -19,5 +19,6 @@ if [[ "$#" -eq 0 ]]; then
 fi
 
 export UV_PROJECT_ENVIRONMENT="$OPENPI_ROOT/.venv"
+export PYTHONPATH="$ROOT${PYTHONPATH:+:$PYTHONPATH}"
 cd "$OPENPI_ROOT"
 exec uv run --project "$OPENPI_ROOT" "$@"

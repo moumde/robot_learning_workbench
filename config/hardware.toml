@@ -1,0 +1,52 @@
+# 工作台硬件运行配置。
+# 本文件不保存密码或密钥；设备 IP、串口和序列号属于本机/现场配置。
+# 应用程序可以通过 --config 指向另一份 TOML 覆盖本文件。
+
+[nrc]
+name = "cr3"
+ip = "192.168.2.14"
+connect_control = false
+connection_timeout = 10.0
+connection_poll_period = 0.2
+
+[nrc.ports]
+control = 6000
+teach = 6001
+track = 7000
+
+[nrc.servoj]
+# NRC SDK 单位：六个旋转关节为 degree/s、degree/s^2、degree/s^3；
+# 第七个 external axis 的单位由机器人配置决定。
+vmax = [500.0, 500.0, 500.0, 500.0, 500.0, 500.0, 500.0]
+amax = [500.0, 500.0, 500.0, 500.0, 500.0, 500.0, 500.0]
+jmax = [500.0, 500.0, 500.0, 500.0, 500.0, 500.0, 500.0]
+
+[hand.linkerhand]
+name = "right_o6"
+side = "right"
+model = "O6"
+joint_count = 6
+state_min = 0
+state_max = 255
+transport = "rs485"
+modbus = "/dev/ttyUSB0"
+can = "can0"
+
+[cameras.d435]
+width = 640
+height = 480
+fps = 30
+output_width = 224
+output_height = 224
+async_read = true
+read_timeout_ms = 500
+
+[cameras.d435.devices.base_0_rgb]
+serial = "254622075848"
+
+[cameras.d435.devices.left_wrist_0_rgb]
+serial = "317222074617"
+
+[cameras.d435.devices.right_wrist_0_rgb]
+serial = "262422074985"
+

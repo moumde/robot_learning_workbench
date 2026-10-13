@@ -9,6 +9,10 @@ __pycache__/
 .env.*
 !.env.example
 
+# Local hardware overrides (the checked-in baseline is config/hardware.toml)
+config/hardware.local.toml
+config/*.local.toml
+
 # IDE / OS
 .vscode/
 .idea/

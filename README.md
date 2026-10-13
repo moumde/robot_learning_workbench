@@ -1,87 +1,98 @@
 # Robot Learning Workbench
 
-设计约定：
+Robot Learning Workbench 是一个面向机器人学习研发的基线工程。它把 OpenPI 算法框架、硬件适配、训练/部署脚本和协同开发约定放在同一个仓库中，目标是让新成员能够：
 
-- `module/openpi/` 是唯一随工作台固定版本管理的算法框架，使用 Git Submodule。
-- **不单独拉取 LeRobot**。OpenPI 的 `pyproject.toml` / `uv.lock` 已声明它使用的 LeRobot 依赖及版本来源，环境由 OpenPI 自己管理。
-- Python 依赖安装到 `module/openpi/.venv/`，不创建工作台根目录 `.venv`，也不使用系统 Python `pip install`。
-- 父仓库提交的 Submodule commit 用于固定团队所用的 OpenPI 版本；OpenPI 的锁文件固定 Python 依赖解析结果。
-- 数据集、checkpoint、日志不进入 Git。
+- 用一条明确的流程完成环境部署；
+- 在固定版本的 OpenPI 上复现实验；
+- 在不污染算法环境的前提下接入 NRC 机器人和其他硬件；
+- 使用统一的脚本启动训练、服务端、客户端和硬件测试。
 
-> 当前脚本面向 Ubuntu 22.04 + NVIDIA GPU 的常见 OpenPI 开发场景。OpenPI 上游声明 Python >= 3.11，并推荐使用 `uv`。具体 GPU、驱动、CUDA 运行时的兼容性仍需要在目标机器上验证。
+当前基线面向 Ubuntu 22.04、`uv` 和常见 NVIDIA GPU 开发场景。CPU 机器可以完成部分导入和接口测试，但训练和 GPU 推理仍需要匹配的 NVIDIA 驱动、CUDA/JAX/PyTorch 环境。
 
-## 1. 仓库维护者：创建团队基线
+## 1. 环境边界
 
-### 1.1 解压模板并初始化父仓库
+本项目明确维护两套 Python 环境：
 
-```bash
-git init -b main
-git add .
-git commit -m "chore: add robot learning workbench skeleton"
+| 用途 | 环境目录 | Python | 启动方式 |
+| --- | --- | --- | --- |
+| OpenPI 训练、模型服务端、相机/LeRobot 相关程序 | `module/openpi/.venv/` | 由 OpenPI 的 `.python-version` 固定，当前为 3.11 | `./scripts/run_openpi.sh ...` |
+| NRC 机器人客户端、NRC 厂商动态库和网络部署程序 | `module/nrc/.venv/` | 3.12 | `./scripts/run_nrc.sh ...` |
+
+NRC 厂商动态库 `_nrc_host.so` 按 Python 3.12 构建，因此不要在 OpenPI 的 Python 3.11 进程中直接导入它。模型服务端和机器人客户端通过网络协议通信，两个进程可以运行在同一台机器或不同机器上。
+
+这两个环境都不应安装到工作台根目录 `.venv`，也不要使用系统 Python 执行 `pip install`。
+
+### 1.1 硬件配置入口
+
+硬件连接信息统一放在 `config/hardware.toml`，包括：
+
+- NRC 的 IP、控制/示教/跟踪端口、连接超时和 ServoJ 参数；
+- LinkerHand 的左右手、型号、关节数量、状态范围、RS485/CAN 传输方式和设备路径；
+- D435 的逻辑名称、序列号、采集尺寸、输出尺寸、FPS 和读取超时。
+
+NRC 配置中的几个连接参数含义如下：
+
+| 参数 | 作用 |
+| --- | --- |
+| `connect_control` | 是否额外连接 `6000` 控制端口；为 `false` 时只连接示教端口 `6001` 和跟踪端口 `7000`。当前接口主要使用 `6001` 读取状态/执行状态操作、使用 `7000` 执行 ServoJ，`6000` 作为可选连接保留。 |
+| `connection_timeout` | 单个端口从发起连接到连接状态就绪的最长等待时间，单位为秒。 |
+| `connection_poll_period` | 连接建立后检查连接状态的轮询间隔，单位为秒。默认 `0.2` 表示每 200 ms 检查一次。 |
+
+推荐保持以下配置，除非现场控制器的网络响应特性有变化：
+
+```toml
+[nrc]
+connect_control = false
+connection_timeout = 10.0
+connection_poll_period = 0.2
+
+[nrc.ports]
+control = 6000
+teach = 6001
+track = 7000
 ```
 
-在 GitHub/GitLab 创建空的团队仓库后，关联远程地址并推送：
+`config/hardware.py` 是配置中间层。它负责读取和校验 TOML，并提供接口工厂：
 
-```bash
-git remote add origin <团队仓库 SSH 或 HTTPS 地址>
-git push -u origin main
+```python
+from config.hardware import load_hardware_config
+
+hardware = load_hardware_config()
+robot = hardware.create_nrc_interface()
+cameras = hardware.create_d435_interface()
+hand_kwargs = hardware.hand.api_kwargs()
 ```
 
-如果这个模板本来就是从团队 Git 仓库克隆来的，则跳过本节。
+其他程序应优先复用这套配置和工厂，不要再次在业务代码中复制 IP、端口、相机序列号或图像规格。现场机器需要不同配置时，可以通过 `--config /path/to/hardware.toml` 指定另一份 TOML；不要把包含账号、密钥的配置提交到仓库。
 
-### 1.2 添加 OpenPI Submodule（仅由维护者首次执行）
+## 2. 快速开始
 
-```bash
-./scripts/add_openpi_submodule.sh
-```
+### 2.1 获取代码
 
-脚本会把官方 `Physical-Intelligence/openpi` 仓库添加到 `module/openpi/`，并初始化 OpenPI 自己的子模块。默认检出上游默认分支当时的提交。
-
-检查实际使用的版本：
-
-```bash
-git -C module/openpi rev-parse HEAD
-git -C module/openpi status --short
-```
-
-然后提交父仓库里的 `.gitmodules` 和 Submodule commit：
-
-```bash
-git add .gitmodules module/openpi
-git commit -m "build: pin OpenPI submodule revision"
-git push
-```
-
-**多人协作的关键是提交父仓库中的 Submodule commit。** 其他成员会获得该固定提交，不应每个人自行执行 `git submodule update --remote`。
-
-如果团队要修改 OpenPI 源码，建议先 Fork OpenPI 到团队组织，再把 Submodule URL 指向团队 Fork；不要把开发者的未提交修改留在本地子模块中。
-
-## 2. 所有开发者：第一次部署
-
-### 2.1 克隆完整团队代码
+维护者创建团队仓库后，其他开发者使用递归克隆：
 
 ```bash
 git clone --recurse-submodules <团队仓库 SSH 或 HTTPS 地址> robot_learning_workbench
 cd robot_learning_workbench
 ```
 
-如果之前没有递归克隆，执行：
+如果已经普通克隆过仓库：
 
 ```bash
 git submodule update --init --recursive
 ```
 
-### 2.2 安装系统工具与 uv（可选）
+### 2.2 安装系统工具和 uv
 
-Ubuntu 22.04：
+Ubuntu/Debian 用户可以执行：
 
 ```bash
 ./scripts/install_system_deps_ubuntu.sh
 ```
 
-脚本只安装常用的系统工具（Git、Git LFS、curl、编译工具、FFmpeg 等），不会自动安装或修改 NVIDIA 显卡驱动。系统软件安装需要 `sudo`。
+脚本会安装 Git、Git LFS、编译工具、OpenGL/FFmpeg 等常用依赖，不会安装或修改 NVIDIA 驱动。
 
-如果尚未安装 `uv`：
+如果系统还没有 `uv`：
 
 ```bash
 curl -LsSf https://astral.sh/uv/install.sh | sh
@@ -89,135 +100,368 @@ export PATH="$HOME/.local/bin:$PATH"
 uv --version
 ```
 
-如果已经安装 `uv`，不必重复安装。
-
-### 2.3 一键创建并验证 OpenPI 专属环境
+### 2.3 创建并验证 OpenPI 环境
 
 ```bash
 ./scripts/bootstrap.sh
 ```
 
-该脚本会初始化 Submodule、安装依赖并运行环境检查。也可以分开执行：
+该脚本会初始化 Submodule、根据 OpenPI 的 `pyproject.toml` 和 `uv.lock` 创建 `module/openpi/.venv/`，然后检查以下模块是否可以导入：
+
+- `openpi`
+- `lerobot`
+- `jax`
+- `torch`
+- `cv2`
+
+也可以分开执行：
 
 ```bash
 ./scripts/setup_openpi_env.sh
 ./scripts/verify_openpi_env.sh
 ```
 
-脚本会：
-
-1. 检查 OpenPI Submodule 和 `uv` 是否存在；
-2. 初始化 OpenPI 自身需要的 Git 子模块；
-3. 使用 OpenPI 的 `.python-version`、`pyproject.toml` 和 `uv.lock` 建立依赖环境；
-4. 把环境固定到 `module/openpi/.venv/`；
-5. 以 editable 模式安装 OpenPI 本身。
-
-安装时间和下载量取决于机器、网络、缓存以及 CUDA/JAX/Torch 依赖。首次安装需要网络连接。
-
-### 2.4 验证环境
-
-```bash
-./scripts/verify_openpi_env.sh
-```
-
-该脚本检查 Python 解释器路径、OpenPI、LeRobot、JAX、PyTorch、OpenCV 的导入情况，并报告 JAX/Torch 是否能看到 GPU。它是环境 smoke test，不代表已经验证真实机械臂、相机或完整训练过程。
-
-如果要进一步检查 NVIDIA 驱动：
+验证主机 GPU：
 
 ```bash
 nvidia-smi
 ```
 
-### 2.5 运行 OpenPI 命令
+没有 GPU 时，环境 smoke test 仍可能通过，但不能据此认为训练或 GPU 推理可用。
 
-使用统一包装脚本，确保命令从 OpenPI 项目目录、在 OpenPI 的虚拟环境中运行：
+### 2.4 创建 NRC Python 3.12 环境
+
+只有需要 NRC 机器人、NRC 部署客户端或 NRC 接口测试时才需要执行：
+
+```bash
+./scripts/setup_nrc_env.sh
+```
+
+该脚本创建 `module/nrc/.venv/`，安装 OpenPI 的轻量客户端包以及 NRC/LinkerHand 网络和 RS485 测试需要的基础依赖。启动 NRC 程序时使用：
+
+```bash
+./scripts/run_nrc.sh python <程序路径> [参数]
+```
+
+例如：
+
+```bash
+./scripts/run_nrc.sh python test/test_nrc_interface.py
+```
+
+`run_nrc.sh` 会检查 Python 3.12，并为 NRC 厂商动态库补充对应的 Python 共享库路径。
+
+## 3. 常用开发流程
+
+### 3.1 运行 OpenPI 程序
 
 ```bash
 ./scripts/run_openpi.sh python -c \
-  "import sys, openpi, lerobot, jax, torch; print(sys.executable); print('OpenPI imports OK'); print('Torch CUDA:', torch.cuda.is_available()); print('JAX devices:', jax.devices())"
+  "import sys, openpi, lerobot, jax, torch; print(sys.executable); print(jax.devices())"
 ```
 
-训练时示例（把 `<config_name>` 和 `<experiment_name>` 替换成所用 OpenPI 版本中真实存在的配置和实验名）：
+`run_openpi.sh` 会自动：
+
+- 使用 `module/openpi/.venv/`；
+- 将当前工作目录切换到 `module/openpi/`；
+- 通过 OpenPI 项目配置运行命令。
+
+因此，从仓库根目录运行工作台测试文件时，需要使用相对于 `module/openpi/` 的路径，例如：
 
 ```bash
-./scripts/run_openpi.sh scripts/train.py <config_name> --exp-name=<experiment_name>
+./scripts/run_openpi.sh python ../../test/test_hand_camera.py
 ```
 
-可用训练配置以当前固定版本的 `module/openpi/src/openpi/training/config.py` 为准。不要直接复制另一版本的命令或配置名称。
+### 3.2 训练
 
-## 3. 后续日常使用与更新原则
+训练配置和参数以当前固定的 OpenPI Submodule 为准：
 
-### 开发者同步团队已固定的版本
+```bash
+./scripts/run_openpi.sh scripts/train.py \
+  <config_name> --exp-name=<experiment_name>
+```
+
+不要直接复制其他 OpenPI 版本的配置名称。实际可用配置请查看：
+
+```text
+module/openpi/src/openpi/training/config.py
+```
+
+### 3.3 启动模型服务端
+
+模型服务端应使用 OpenPI 环境。当前基线不强行规定唯一的服务端入口，接入具体服务程序后按实际文件运行：
+
+```bash
+./scripts/run_openpi.sh python <server_program>.py [参数]
+```
+
+服务端脚本和参数以当前项目实现为准。启动后，部署客户端通过网络访问服务端，不需要在客户端环境中安装完整训练栈。
+
+### 3.4 启动部署客户端
+
+部署客户端使用 NRC 3.12 环境：
+
+```bash
+./scripts/run_nrc.sh python deploy/<client_program>.py [参数]
+```
+
+如果客户端还需要 D435 相机、LinkerHand 或其他厂商 SDK，应将这些依赖安装到客户端实际使用的环境，并在团队文档或依赖清单中记录，不能只依赖个人机器上的临时安装。
+
+## 4. 硬件测试
+
+### 4.1 NRC 机械臂接口测试
+
+默认是只读测试，会从 `config/hardware.toml` 读取 IP 和端口，连接示教端口 `6001` 和跟踪端口 `7000`，读取伺服状态、关节位置、TCP 位姿，并检查笛卡尔位姿转关节接口：
+
+```bash
+./scripts/run_nrc.sh python test/test_nrc_interface.py
+```
+
+临时覆盖机器人 IP：
+
+```bash
+./scripts/run_nrc.sh python test/test_nrc_interface.py --ip 192.168.2.14
+```
+
+可选参数：
+
+```bash
+# 跳过笛卡尔转关节检查
+./scripts/run_nrc.sh python test/test_nrc_interface.py \
+  --ip 192.168.2.14 --skip-cartesian
+
+# 同时连接控制端口 6000
+./scripts/run_nrc.sh python test/test_nrc_interface.py \
+  --ip 192.168.2.14 --connect-control
+
+# 受监督地测试 ServoJ 控制路径
+./scripts/run_nrc.sh python test/test_nrc_interface.py \
+  --ip 192.168.2.14 --control-test
+```
+
+`--connect-control` 会覆盖配置中的 `connect_control`，使测试额外连接 `6000`；`--no-connect-control` 可以强制关闭该连接。`connection_poll_period` 只影响连接建立阶段的状态检查频率，不会改变 ServoJ 控制周期。
+
+`--control-test` 可能会执行上电、打开 ServoJ、发送当前关节位置和下电操作。即使目标位置是当前值，也必须确认机器人周围安全并由人员现场监护。
+
+### 4.2 LinkerHand 与 D435 测试
+
+测试默认通过 OpenPI 环境运行，因为相机接口复用了 OpenPI/LeRobot 的 RealSense 实现：
+
+```bash
+./scripts/run_openpi.sh python ../../test/test_hand_camera.py
+```
+
+默认从 `config/hardware.toml` 读取手的传输方式、设备路径和相机参数。临时使用 CAN 或覆盖 RS485 设备时：
+
+```bash
+./scripts/run_openpi.sh python ../../test/test_hand_camera.py \
+  --transport can --can can0
+```
+
+该测试只连接右手 O6、读取当前手指状态、连接三台 D435 并读取图像，不发送手部运动命令。
+
+运行前需要确认：
+
+- LinkerHand SDK 位于 `vendor/actuator/linkerhand-python-sdk/`；
+- RS485 时串口设备存在且当前用户有权限访问；
+- CAN 时 `can0` 已正确配置；
+- 三台 D435 的序列号与 `config/hardware.toml` 中的配置一致；
+- OpenPI 环境中已经具备 LeRobot RealSense 后端、`pyrealsense2` 以及 LinkerHand SDK 所需的硬件依赖。
+
+RS485 测试至少需要 `pymodbus==3.5.1` 和 `pyserial`。如果 OpenPI 环境还没有这些包，应安装到 OpenPI 环境，而不是系统 Python：
+
+```bash
+uv pip install --python module/openpi/.venv/bin/python \
+  pymodbus==3.5.1 pyserial
+```
+
+LinkerHand SDK 的完整依赖清单位于：
+
+```text
+vendor/actuator/linkerhand-python-sdk/requirements.txt
+```
+
+安装完整清单前请先评估它与 OpenPI 锁定依赖的兼容性；硬件专用依赖应由团队统一记录。
+
+## 5. 仓库结构
+
+```text
+robot_learning_workbench/
+├── vendor/                 # NRC、相机、末端执行器等硬件适配
+├── config/                 # 运行时硬件配置和配置中间层
+├── teleop/                 # 遥操功能
+├── hmi/                    # 数据采集、训练和部署界面
+├── module/
+│   ├── openpi/             # OpenPI Git Submodule
+│   └── nrc/                # NRC 独立环境目录，不提交 .venv
+├── core/                   # 工作台核心业务逻辑
+├── configs/                # 训练任务/业务配置
+├── test/                   # 接口、相机和硬件测试
+├── dataset/
+│   ├── train/              # 训练数据，不进 Git
+│   └── replay/             # 回放轨迹，不进 Git
+├── checkpoints/            # 模型权重，不进 Git
+├── thirdparty/             # 确实需要 vendoring 的第三方代码
+├── scripts/                # 部署、环境、验证和启动脚本
+└── logs/                   # 本地运行日志，不进 Git
+```
+
+OpenPI 源码只维护在 `module/openpi/`，不要复制到工作台其他目录。工作台自己的业务代码应放在 `core/`、`vendor/`、`teleop/`、`hmi/` 等目录中。
+
+## 6. 脚本说明
+
+| 脚本 | 用途 |
+| --- | --- |
+| `scripts/add_openpi_submodule.sh` | 由维护者首次添加官方 OpenPI Submodule |
+| `scripts/install_system_deps_ubuntu.sh` | 安装 Ubuntu/Debian 系统工具和基础库 |
+| `scripts/bootstrap.sh` | 初始化 Submodule、创建并验证 OpenPI 环境 |
+| `scripts/setup_openpi_env.sh` | 按 OpenPI 锁文件安装 `module/openpi/.venv/` |
+| `scripts/verify_openpi_env.sh` | 检查 OpenPI、LeRobot、JAX、Torch、OpenCV 和 GPU |
+| `scripts/run_openpi.sh` | 在 OpenPI 3.11 环境和 OpenPI 工作目录中运行命令 |
+| `scripts/setup_nrc_env.sh` | 创建独立的 Python 3.12 NRC 客户端环境 |
+| `scripts/run_nrc.sh` | 在 NRC 环境、仓库根目录中运行命令 |
+
+日常运行 Python 程序时，优先使用对应的启动脚本，不要直接调用系统 `python`。这可以避免 Python 版本、当前工作目录和动态库搜索路径不一致。
+
+## 7. 协同开发规则
+
+### 7.1 OpenPI 版本由父仓库固定
+
+如果这是一个刚创建的工作台模板，维护者先初始化父仓库并推送团队远程：
+
+```bash
+git init -b main
+git add .
+git commit -m "chore: add robot learning workbench baseline"
+git remote add origin <团队仓库 SSH 或 HTTPS 地址>
+git push -u origin main
+```
+
+维护者首次添加 OpenPI：
+
+```bash
+./scripts/add_openpi_submodule.sh
+git add .gitmodules module/openpi
+git commit -m "build: pin OpenPI submodule revision"
+```
+
+其他成员同步固定版本：
 
 ```bash
 git pull --ff-only
 git submodule update --init --recursive
 ```
 
-一般不需要每次重新建环境。只有 OpenPI 的 `pyproject.toml` / `uv.lock` 变化，或者维护者明确要求重建环境时，再执行：
+不要由每个开发者自行执行 `git submodule update --remote`。如果团队需要修改 OpenPI，建议维护团队 Fork，并在经过验证后统一更新父仓库中的 Submodule commit。
+
+### 7.2 依赖变更需要可复现
+
+- OpenPI 依赖以 `module/openpi/pyproject.toml` 和 `module/openpi/uv.lock` 为准。
+- 不要单独拉取或复制另一套 LeRobot；当前 OpenPI 版本会声明和锁定它需要的 LeRobot。
+- 不要在系统 Python 上安装项目依赖。
+- 工作台新增依赖时，要说明属于 OpenPI 环境、NRC 环境还是系统/ROS 环境。
+- 需要长期保留的依赖必须进入脚本、依赖清单或正式文档，不能只在个人环境中手动安装。
+- ROS 2 Humble、相机驱动和厂商 SDK 可以有独立的系统依赖，不要未经评估直接塞进 OpenPI 锁定环境。
+
+### 7.3 不提交生成物
+
+以下内容默认不进入 Git：
+
+- `.venv/`、Python 缓存和构建产物；
+- 数据集、回放轨迹、模型 checkpoint；
+- 运行日志、临时文件和个人配置；
+- 任何包含设备 IP、账号或密钥的本地配置。
+
+提交前检查：
 
 ```bash
-./scripts/setup_openpi_env.sh
+git status --short
+git diff --check
 ```
 
-环境脚本采用锁文件模式；如果 OpenPI 依赖声明和锁文件不一致，脚本会报错而不是静默更新依赖。应先由维护者审核并提交锁文件更新。
+## 8. 日常更新
 
-### 维护者更新 OpenPI 版本
-
-维护者先在单独的分支中验证新版本，再更新子模块指向并提交：
+同步团队代码：
 
 ```bash
-git -C module/openpi fetch origin
-git -C module/openpi checkout <经过验证的 commit SHA 或 tag>
-git -C module/openpi submodule update --init --recursive
+git pull --ff-only
+git submodule update --init --recursive
+```
+
+通常不需要每次重新安装环境。只有以下情况才运行相应脚本：
+
+- OpenPI 的 `pyproject.toml` 或 `uv.lock` 发生变化：运行 `./scripts/setup_openpi_env.sh`；
+- NRC 客户端依赖或 Python 版本发生变化：运行 `./scripts/setup_nrc_env.sh`；
+- OpenPI Submodule 指向发生变化：同步后重新运行 `./scripts/verify_openpi_env.sh`。
+
+更新 OpenPI 前，维护者应先在独立分支中完成环境、导入和关键流程验证，再提交新的 Submodule 指针。
+
+## 9. 常见问题
+
+### OpenPI Submodule 缺失
+
+```bash
+git submodule update --init --recursive
+```
+
+如果工作台尚未登记 OpenPI，先由维护者运行：
+
+```bash
+./scripts/add_openpi_submodule.sh
+```
+
+### `run_openpi.sh` 找不到环境
+
+执行：
+
+```bash
 ./scripts/setup_openpi_env.sh
 ./scripts/verify_openpi_env.sh
-
-git add module/openpi
-git commit -m "build: update pinned OpenPI revision"
-git push
 ```
 
-如果新提交的 `pyproject.toml` 与 `uv.lock` 不一致，应在 OpenPI 子模块的维护分支内按该版本的官方要求更新锁文件、完成验证并先提交 OpenPI 仓库，然后再更新父仓库中的 Submodule commit。
+### NRC 报 Python 版本或 `libpython3.12.so` 错误
 
-## 4. 目录约定
+不要使用 `run_openpi.sh` 启动 NRC 程序。执行：
 
-```text
-robot_learning_workbench/
-├── vendor/                 # NRC、相机、末端执行器等硬件相关适配/代码
-├── teleop/                 # 遥操功能
-├── hmi/
-│   ├── data_collect/       # 数采界面
-│   ├── train/              # 训练界面
-│   └── deploy/             # 部署界面
-├── module/
-│   └── openpi/             # OpenPI Git Submodule（包含其指定的 LeRobot 依赖）
-├── core/                   # 核心业务逻辑
-│   └── openpi/             # OpenPI相关功能
-├── configs/                # 工作台自己的配置
-├── dataset/
-│   ├── train/              # 本地训练数据，不进 Git
-│   └── replay/             # 本地回放轨迹，不进 Git
-├── checkpoints/            # 本地模型权重，不进 Git
-├── thirdparty/             # 其他确实需要 vendoring 的第三方代码/SDK
-├── scripts/                # 环境安装、验证和 OpenPI 包装脚本
-└── logs/                   # 本地运行日志，不进 Git
+```bash
+./scripts/setup_nrc_env.sh
+./scripts/run_nrc.sh python test/test_nrc_interface.py \
+  --ip 192.168.2.14
 ```
 
-当前业务目录只放了 `.gitkeep`，没有预先生成任何业务 Python 文件。不要把 OpenPI 完整源码复制到工作台其他目录；需要导入 OpenPI 的开发脚本应使用 `module/openpi/.venv/bin/python` 执行，或通过 `scripts/run_openpi.sh` 调用。
+### RS485 报 `No module named pymodbus`
 
-## 5. 环境隔离与提交规则
+确认依赖安装在实际运行测试的环境中。`test_hand_camera.py` 使用 OpenPI 环境，因此安装命令应指向：
 
-- 不提交任何 `.venv/`、缓存、数据集、checkpoint、日志或个人 `.env`。
-- 不要在系统 Python 上运行 `pip install` 安装 OpenPI 依赖。
-- 不要把另一套 LeRobot 源码放进 `module/lerobot/`；当前 OpenPI 版本所需的 LeRobot 版本由 OpenPI 的依赖配置和锁文件决定。
-- 不要由每个开发者自行升级 OpenPI 子模块。版本更新由维护者统一验证、提交。
-- 不要在 OpenPI 环境中随手安装未声明的额外包。未来工作台 GUI 若需要 OpenPI 未包含的依赖，应先由团队决定并记录依赖方案，避免只在某个人电脑上可用。
-- ROS 2 Humble 和硬件驱动可能有独立的系统/Python 依赖；该基线不擅自把 ROS 依赖安装进 OpenPI 环境。等接入真实机器人时，再明确选择进程/接口边界。
+```bash
+uv pip install --python module/openpi/.venv/bin/python \
+  pymodbus==3.5.1 pyserial
+```
 
-## 官方参考
+NRC 客户端则使用 `setup_nrc_env.sh` 创建的 `module/nrc/.venv/`。
+
+### 相机无法连接
+
+优先检查：
+
+- `pyrealsense2` 是否安装在 OpenPI 环境；
+- 相机 USB 连接、权限和序列号；
+- `camera_interface.py` 中的序列号是否与实际设备一致；
+- 是否已经安装并启用了 RealSense 所需的系统组件。
+
+### GPU 未发现
+
+`verify_openpi_env.sh` 会区分“Python 包可导入”和“GPU 可用”。先检查：
+
+```bash
+nvidia-smi
+```
+
+然后确认 NVIDIA 驱动、CUDA 运行库和当前 OpenPI 锁定的 JAX/PyTorch 组合兼容。
+
+## 10. 官方参考
 
 - [OpenPI 官方仓库](https://github.com/Physical-Intelligence/openpi)
-- [OpenPI 官方安装说明](https://github.com/Physical-Intelligence/openpi#installation)
+- [OpenPI 安装说明](https://github.com/Physical-Intelligence/openpi#installation)
 - [Astral uv 安装文档](https://docs.astral.sh/uv/getting-started/installation/)
-- [uv 同步项目与锁文件](https://docs.astral.sh/uv/concepts/projects/sync/)
+- [uv 项目同步与锁文件](https://docs.astral.sh/uv/concepts/projects/sync/)

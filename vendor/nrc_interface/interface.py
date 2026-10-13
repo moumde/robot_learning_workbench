@@ -140,10 +140,24 @@ class CR3Interface:
     (degrees/s, degrees/s², and degrees/s³ for the six rotational joints).
     """
 
+    @classmethod
+    def from_config(cls, config_path: str | None = None, **overrides: Any):
+        """Create an interface from ``config/hardware.toml``."""
+
+        from config.hardware import load_hardware_config
+
+        hardware = load_hardware_config(config_path)
+        kwargs = hardware.nrc.interface_kwargs()
+        kwargs.update(overrides)
+        return cls(**kwargs)
+
     def __init__(
         self,
         robot_ip: str = "192.168.2.14",
         *,
+        control_port: int = CONTROL_PORT,
+        teach_port: int = TEACH_PORT,
+        track_port: int = TRACK_PORT,
         connect_control: bool = False,
         connection_timeout: float = 10.0,
         connection_poll_period: float = 0.2,
@@ -152,6 +166,11 @@ class CR3Interface:
         servo_jmax: Sequence[float] | None = None,
     ) -> None:
         self.robot_ip = str(robot_ip)
+        self.control_port = int(control_port)
+        self.teach_port = int(teach_port)
+        self.track_port = int(track_port)
+        if self.control_port <= 0 or self.teach_port <= 0 or self.track_port <= 0:
+            raise ValueError("NRC ports must be positive integers")
         self.connect_control = connect_control
         self.connection_timeout = float(connection_timeout)
         self.connection_poll_period = float(connection_poll_period)
@@ -179,7 +198,7 @@ class CR3Interface:
     def connected(self) -> bool:
         """Whether the teach and tracking sockets are both connected."""
 
-        return TEACH_PORT in self._fds and TRACK_PORT in self._fds
+        return self.teach_port in self._fds and self.track_port in self._fds
 
     @property
     def servo_active(self) -> bool:
@@ -228,13 +247,15 @@ class CR3Interface:
 
         with self._lock:
             if self._fds:
-                if self.connected and (not self.connect_control or CONTROL_PORT in self._fds):
+                if self.connected and (
+                    not self.connect_control or self.control_port in self._fds
+                ):
                     return self
                 raise NRCConnectionError("partial NRC connection already exists; call disconnect() first")
 
-            ports = [TEACH_PORT, TRACK_PORT]
+            ports = [self.teach_port, self.track_port]
             if self.connect_control:
-                ports.insert(0, CONTROL_PORT)
+                ports.insert(0, self.control_port)
             connected: list[int] = []
             try:
                 for port in ports:
@@ -279,7 +300,7 @@ class CR3Interface:
         """Return the NRC servo state: stopped=0, ready=1, error=2, running=3."""
 
         with self._lock:
-            fd = self._fd(TEACH_PORT)
+            fd = self._fd(self.teach_port)
             output = 0
             result = self._call("get_servo_state", _nrc.get_servo_state, fd, output)
             output = _output_from_result(result, output)
@@ -302,7 +323,9 @@ class CR3Interface:
 
         with self._lock:
             output = 0
-            result = self._call("get_current_mode", _nrc.get_current_mode, self._fd(TEACH_PORT), output)
+            result = self._call(
+                "get_current_mode", _nrc.get_current_mode, self._fd(self.teach_port), output
+            )
             output = _output_from_result(result, output)
             if isinstance(output, (tuple, list)):
                 output = output[0]
@@ -315,13 +338,13 @@ class CR3Interface:
         """Clear the controller error state."""
 
         with self._lock:
-            self._call("clear_error", _nrc.clear_error, self._fd(TEACH_PORT))
+            self._call("clear_error", _nrc.clear_error, self._fd(self.teach_port))
 
     def power_on(self) -> None:
         """Run the ROS2 driver's clear-error, ready, and power-on sequence."""
 
         with self._lock:
-            fd = self._fd(TEACH_PORT)
+            fd = self._fd(self.teach_port)
             state = self.get_servo_state()
             if state == SERVO_RUNNING:
                 return
@@ -358,7 +381,7 @@ class CR3Interface:
         """Power the robot off, matching the ROS2 driver's state check."""
 
         with self._lock:
-            fd = self._fd(TEACH_PORT)
+            fd = self._fd(self.teach_port)
             state = self.get_servo_state()
             if state != SERVO_RUNNING:
                 raise NRCCommandError("set_servo_poweroff (servo is not running)", state)
@@ -386,7 +409,7 @@ class CR3Interface:
         """Open ServoJ tracking after verifying that the robot is running."""
 
         with self._lock:
-            fd = self._fd(TRACK_PORT)
+            fd = self._fd(self.track_port)
             state = self.get_servo_state()
             if state != SERVO_RUNNING:
                 raise NRCCommandError("open_servoJ (servo is not running)", state)
@@ -412,7 +435,7 @@ class CR3Interface:
         """Close ServoJ tracking (or use the legacy SDK stop operation)."""
 
         with self._lock:
-            fd = self._fd(TRACK_PORT)
+            fd = self._fd(self.track_port)
             if not self._servo_active:
                 return
             result = self._close_servoj_sdk(fd)
@@ -450,7 +473,7 @@ class CR3Interface:
             self._call(
                 "set_servoJ_pos",
                 _nrc.set_servoJ_pos,
-                self._fd(TRACK_PORT),
+                self._fd(self.track_port),
                 self._joint_command_degrees(joint_positions_rad, external_axis),
             )
 
@@ -478,7 +501,7 @@ class CR3Interface:
             result = self._call(
                 "get_current_position(joint)",
                 _nrc.get_current_position,
-                self._fd(TEACH_PORT),
+                self._fd(self.teach_port),
                 0,
                 output,
             )
@@ -500,7 +523,7 @@ class CR3Interface:
             result = self._call(
                 "get_current_position(cartesian)",
                 _nrc.get_current_position,
-                self._fd(TEACH_PORT),
+                self._fd(self.teach_port),
                 1,
                 output,
             )
@@ -523,7 +546,7 @@ class CR3Interface:
             result = self._call(
                 "get_origin_coord_to_target_coord",
                 _nrc.get_origin_coord_to_target_coord,
-                self._fd(TEACH_PORT),
+                self._fd(self.teach_port),
                 1,
                 _sdk_vector(sdk_pose),
                 0,
