@@ -20,5 +20,6 @@ fi
 
 export UV_PROJECT_ENVIRONMENT="$OPENPI_ROOT/.venv"
 export PYTHONPATH="$ROOT${PYTHONPATH:+:$PYTHONPATH}"
+export HF_LEROBOT_HOME="${HF_LEROBOT_HOME:-$ROOT/dataset/train}"
 cd "$OPENPI_ROOT"
 exec uv run --project "$OPENPI_ROOT" "$@"

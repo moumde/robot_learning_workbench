@@ -188,7 +188,7 @@ module/openpi/src/openpi/training/config.py
   pi05_cr3_o6_lora --exp-name=pi05_cr3_o6_lora
 ```
 
-该配置使用 `module/openpi/src/openpi/policies/cr3_o6_policy.py` 完成三路图像、12 维状态/动作与 Pi05 32 维动作头之间的适配：输入数据使用 12 维动作，模型内部补齐到 32 维，推理输出再裁剪回 12 维。训练前需要准备 LeRobot 数据集 `local/data_v21`，并让它位于 `HF_LEROBOT_HOME/local/data_v21`；也可以将配置中的 `repo_id` 改为团队实际使用的 Hugging Face 数据集 ID。数据字段应包含：
+该配置使用 `module/openpi/src/openpi/policies/cr3_o6_policy.py` 完成三路图像、12 维状态/动作与 Pi05 32 维动作头之间的适配：输入数据使用 12 维动作，模型内部补齐到 32 维，推理输出再裁剪回 12 维。将 LeRobot 数据集放在 `dataset/train/data_v21`；`run_openpi.sh` 默认设置 `HF_LEROBOT_HOME` 为 `dataset/train/`，配置以 `data_v21` 加载该目录。需要使用其他位置时，可在启动命令前设置 `HF_LEROBOT_HOME`。数据字段应包含：
 
 - `observation.images.base_0_rgb`
 - `observation.images.left_wrist_0_rgb`
@@ -199,10 +199,10 @@ module/openpi/src/openpi/training/config.py
 其中基座相机必须存在；策略变换层对缺失的腕部相机会使用黑图和无效 mask，但数据集的 repack 字段仍应与上述命名保持一致。首次准备数据时，可先计算归一化统计量：
 
 ```bash
-./scripts/run_openpi.sh scripts/compute_norm_stats.py pi05_cr3_o6_lora
+./scripts/run_openpi.sh scripts/compute_norm_stats.py --config-name pi05_cr3_o6_lora
 ```
 
-默认统计文件会写入 `module/openpi/assets/pi05_cr3_o6_lora/local/data_v21/`。如果团队使用其他数据集 ID，应同步修改配置中的 `repo_id`，并重新计算统计量。
+统计文件会写入项目根目录 `assets/pi05_cr3_o6_lora/local/data_v21/`；训练 checkpoint 保存于根目录 `checkpoints/pi05_cr3_o6_lora/<实验名>/<步数>/`，并将统计文件复制到 checkpoint 的 `assets/local/data_v21/`。已有 checkpoint 若没有内嵌统计量，服务端会回退加载上述项目 assets，因此先运行统计量计算命令即可。
 
 ### 3.3 启动模型服务端
 

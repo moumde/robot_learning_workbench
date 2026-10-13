@@ -33,6 +33,7 @@ import openpi.transforms as _transforms
 ModelType: TypeAlias = _model.ModelType
 # Work around a tyro issue with using nnx.filterlib.Filter directly.
 Filter: TypeAlias = nnx.filterlib.Filter
+_WORKSPACE_ROOT = pathlib.Path(__file__).resolve().parents[5]
 
 
 @dataclasses.dataclass(frozen=True)
@@ -989,14 +990,16 @@ _CONFIGS = [
             discrete_state_input=False,
         ),
         data=LeRobotCR3O6DataConfig(
-            # Register the dataset under HF_LEROBOT_HOME/local/data_v21.
-            # This keeps the config portable across machines.
-            repo_id="local/data_v21",
+            # run_openpi.sh defaults HF_LEROBOT_HOME to the workspace dataset/train folder.
+            repo_id="data_v21",
+            assets=AssetsConfig(asset_id="local/data_v21"),
             base_config=DataConfig(
                 prompt_from_task=True,
                 action_sequence_keys=("action",),
             ),
         ),
+        assets_base_dir=str(_WORKSPACE_ROOT / "assets"),
+        checkpoint_base_dir=str(_WORKSPACE_ROOT / "checkpoints"),
         weight_loader=weight_loaders.CheckpointWeightLoader(
             "gs://openpi-assets/checkpoints/pi05_base/params"
         ),

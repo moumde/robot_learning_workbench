@@ -26,6 +26,8 @@ dataset/replay/*
 !dataset/replay/.gitkeep
 checkpoints/*
 !checkpoints/.gitkeep
+assets/*
+!assets/.gitkeep
 logs/*
 !logs/.gitkeep
 
