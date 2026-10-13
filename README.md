@@ -24,7 +24,7 @@ NRC 厂商动态库 `_nrc_host.so` 按 Python 3.12 构建，因此不要在 Open
 
 ### 1.1 硬件配置入口
 
-硬件连接信息统一放在 `config/hardware.toml`，包括：
+硬件 profile 放在 `config/hardware/`。当前默认 profile 是 `config/hardware/cr3_o6.toml`，包含一套 CR3、O6 和 D435 的设备连接信息：
 
 - NRC 的 IP、控制/示教/跟踪端口、连接超时和 ServoJ 参数；
 - LinkerHand 的左右手、型号、关节数量、状态范围、RS485/CAN 传输方式和设备路径；
@@ -63,7 +63,7 @@ cameras = hardware.create_d435_interface()
 hand_kwargs = hardware.hand.api_kwargs()
 ```
 
-其他程序应优先复用这套配置和工厂，不要再次在业务代码中复制 IP、端口、相机序列号或图像规格。现场机器需要不同配置时，可以通过 `--config /path/to/hardware.toml` 指定另一份 TOML；不要把包含账号、密钥的配置提交到仓库。
+其他程序应优先复用这套配置和工厂，不要再次在业务代码中复制 IP、端口、相机序列号或图像规格。新增一套硬件时，复制并按组合及工位命名，例如 `config/hardware/cr3_o6_lab_b.toml` 或 `config/hardware/cr5_o6_lab_a.toml`；通过 `--config config/hardware/<profile>.toml` 选择。不要把账号、密钥等敏感信息提交到仓库。
 
 ## 2. 快速开始
 
@@ -216,19 +216,37 @@ module/openpi/src/openpi/training/config.py
 
 ### 3.4 启动部署客户端
 
-部署客户端使用 NRC 3.12 环境：
+CR3/O6 客户端业务代码位于 `core/openpi/cr3_o6/deploy_policy.py`，默认从 `config/hardware/cr3_o6.toml` 读取 NRC、O6 和三路 D435 配置。NRC SDK 绑定要求 Python 3.12，因此客户端使用 NRC 环境；策略服务端仍可在 OpenPI 环境中运行。先安装并启动模型服务端（默认监听 8000 端口），再做无运动预览：
 
 ```bash
-./scripts/run_nrc.sh python deploy/<client_program>.py [参数]
+./scripts/run_nrc.sh python core/openpi/cr3_o6/deploy_policy.py --preview-only \
+  --host <模型服务器IP> --port 8000 \
+  --prompt "Pick up the motor and place it on the right side with the protruding side facing left."
 ```
 
-如果客户端还需要 D435 相机、LinkerHand 或其他厂商 SDK，应将这些依赖安装到客户端实际使用的环境，并在团队文档或依赖清单中记录，不能只依赖个人机器上的临时安装。
+预览确认图像、状态和策略响应正常后，真实运动必须显式加 `--confirm-motion`：
+
+```bash
+./scripts/run_nrc.sh python core/openpi/cr3_o6/deploy_policy.py --confirm-motion \
+  --host <模型服务器IP> --port 8000
+```
+
+脚本会以 20 Hz 执行 30 步动作块，并限制 CR3 目标变化速度；启动和退出时会回到脚本内的初始位置。确认机器人周围安全、初始位置适合现场后再启用运动。NRC 环境除 `./scripts/setup_nrc_env.sh` 安装的网络/RS485 依赖外，还需要相机运行依赖（LeRobot、OpenCV、`pyrealsense2`）。可将与 OpenPI 锁文件相同版本的 LeRobot 和 RealSense 依赖安装到 NRC Python 3.12 环境：
+
+```bash
+./scripts/setup_nrc_env.sh
+uv pip install --python module/nrc/.venv/bin/python \
+  "lerobot @ git+https://github.com/huggingface/lerobot@0cf864870cf29f4738d3ade893e6fd13fbd7cdb5" \
+  pyrealsense2
+```
+
+若用 `--config` 指定另一份硬件 TOML，手和相机连接参数也会从该文件读取。
 
 ## 4. 硬件测试
 
 ### 4.1 NRC 机械臂接口测试
 
-默认是只读测试，会从 `config/hardware.toml` 读取 IP 和端口，连接示教端口 `6001` 和跟踪端口 `7000`，读取伺服状态、关节位置、TCP 位姿，并检查笛卡尔位姿转关节接口：
+默认是只读测试，会从 `config/hardware/cr3_o6.toml` 读取 IP 和端口，连接示教端口 `6001` 和跟踪端口 `7000`，读取伺服状态、关节位置、TCP 位姿，并检查笛卡尔位姿转关节接口：
 
 ```bash
 ./scripts/run_nrc.sh python test/test_nrc_interface.py
@@ -268,7 +286,7 @@ module/openpi/src/openpi/training/config.py
 ./scripts/run_openpi.sh python ../../test/test_hand_camera.py
 ```
 
-默认从 `config/hardware.toml` 读取手的传输方式、设备路径和相机参数。临时使用 CAN 或覆盖 RS485 设备时：
+默认从 `config/hardware/cr3_o6.toml` 读取手的传输方式、设备路径和相机参数。临时使用 CAN 或覆盖 RS485 设备时：
 
 ```bash
 ./scripts/run_openpi.sh python ../../test/test_hand_camera.py \
@@ -282,7 +300,7 @@ module/openpi/src/openpi/training/config.py
 - LinkerHand SDK 位于 `vendor/actuator/linkerhand-python-sdk/`；
 - RS485 时串口设备存在且当前用户有权限访问；
 - CAN 时 `can0` 已正确配置；
-- 三台 D435 的序列号与 `config/hardware.toml` 中的配置一致；
+- 三台 D435 的序列号与 `config/hardware/cr3_o6.toml` 中的配置一致；
 - OpenPI 环境中已经具备 LeRobot RealSense 后端、`pyrealsense2` 以及 LinkerHand SDK 所需的硬件依赖。
 
 RS485 测试至少需要 `pymodbus==3.5.1` 和 `pyserial`。如果 OpenPI 环境还没有这些包，应安装到 OpenPI 环境，而不是系统 Python：
@@ -314,6 +332,7 @@ robot_learning_workbench/
 │   │                       # OpenPI 策略与机器人动作/观测适配
 │   └── nrc/                # NRC 独立环境目录，不提交 .venv
 ├── core/                   # 工作台核心业务逻辑
+│   └── openpi/cr3_o6/      # CR3/O6 的 OpenPI 部署客户端业务
 ├── tasks/                  # 训练任务、业务流程和部署任务定义
 ├── test/                   # 接口、相机和硬件测试
 ├── dataset/

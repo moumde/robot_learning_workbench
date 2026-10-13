@@ -155,7 +155,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--config",
         default=None,
-        help="Hardware TOML path (default: config/hardware.toml)",
+        help="Hardware TOML path (default: config/hardware/cr3_o6.toml)",
     )
     parser.add_argument(
         "--transport",

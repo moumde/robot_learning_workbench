@@ -142,7 +142,7 @@ class CR3Interface:
 
     @classmethod
     def from_config(cls, config_path: str | None = None, **overrides: Any):
-        """Create an interface from ``config/hardware.toml``."""
+        """Create an interface from the default CR3/O6 hardware profile."""
 
         from config.hardware import load_hardware_config
 

@@ -1,6 +1,5 @@
-# 工作台硬件运行配置。
-# 本文件不保存密码或密钥；设备 IP、串口和序列号属于本机/现场配置。
-# 应用程序可以通过 --config 指向另一份 TOML 覆盖本文件。
+# CR3 + LinkerHand O6 + 三台 D435 的一套现场配置。
+# 复制并按工位命名 profile，例如 cr3_o6_lab_b.toml；不要提交密钥等敏感信息。
 
 [nrc]
 name = "cr3"
@@ -49,4 +48,3 @@ serial = "317222074617"
 
 [cameras.d435.devices.right_wrist_0_rgb]
 serial = "262422074985"
-

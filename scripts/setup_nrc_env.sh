@@ -28,7 +28,8 @@ uv pip install \
   --python "$NRC_ENV/bin/python" \
   -e "$OPENPI_ROOT/packages/openpi-client" \
   pymodbus==3.5.1 \
-  pyserial
+  pyserial \
+  PyYAML
 
 echo
 echo "NRC environment is ready: $NRC_ENV"

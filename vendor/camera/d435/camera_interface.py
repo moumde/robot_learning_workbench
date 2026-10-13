@@ -1,7 +1,7 @@
 """OpenPI-facing interface for the three CR3/O6 RealSense cameras.
 
 The policy uses three logical image names. Their physical D435 serial numbers
-are maintained in ``config/hardware.toml`` rather than in this adapter:
+are maintained in ``config/hardware/cr3_o6.toml`` rather than in this adapter:
 
 * ``base_0_rgb``
 * ``left_wrist_0_rgb``
@@ -81,7 +81,7 @@ class CR3O6CameraInterface:
     """Capture the three named D435 RGB streams for CR3/O6 OpenPI inference.
 
     When parameters are omitted, the default configuration is read from
-    ``config/hardware.toml``.  The repository baseline uses 640x480 at 30 FPS
+    ``config/hardware/cr3_o6.toml``.  The repository baseline uses 640x480 at 30 FPS
     from each camera, converted to 224x224 RGB images for the policy.
     ``async_read=True`` uses LeRobot's background frame buffers so a camera
     read does not block the robot-control loop on every frame.
@@ -179,7 +179,7 @@ class CR3O6CameraInterface:
 
     @classmethod
     def from_config(cls, config_path: str | None = None, **overrides: Any):
-        """Create the camera interface from ``config/hardware.toml``.
+        """Create the camera interface from a hardware profile.
 
         The import is lazy so callers can still import this adapter without
         loading the configuration or constructing any camera backend.

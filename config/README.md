@@ -1,8 +1,8 @@
 # config/
 
-这里放运行时硬件配置和配置中间层。
+这里放运行时硬件 profile 和配置中间层。
 
-- `hardware.toml`：NRC、LinkerHand、D435 的现场连接与规格配置；
+- `hardware/`：每套机器人系统/工位一份 TOML profile；当前默认配置为 `hardware/cr3_o6.toml`；
 - `hardware.py`：读取、校验 TOML，并将配置转换为 `vendor/` 适配层的构造参数。
 
 程序优先使用：
@@ -16,5 +16,5 @@ cameras = hardware.create_d435_interface()
 hand_kwargs = hardware.hand.api_kwargs()
 ```
 
-现场机器需要不同 IP、串口或相机序列号时，复制 `hardware.toml` 到本机私有路径，并通过 `load_hardware_config(path)` 或测试程序的 `--config` 使用。不要把账号、密钥等敏感信息写入被提交的配置文件。
+新增工位或更换设备组合时，复制并命名 profile，例如 `hardware/cr3_o6_lab_b.toml`、`hardware/cr5_o6_lab_a.toml`。通过 `load_hardware_config(path)` 或程序的 `--config` 选择配置。若配置包含不应共享的现场信息，应放在本机私有路径并避免提交账号、密钥等敏感信息。
 

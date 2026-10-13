@@ -17,7 +17,7 @@ except ModuleNotFoundError as exc:  # pragma: no cover - project Python is >= 3.
     raise RuntimeError("Hardware configuration requires Python 3.11 or newer") from exc
 
 
-DEFAULT_CONFIG_PATH = Path(__file__).with_name("hardware.toml")
+DEFAULT_CONFIG_PATH = Path(__file__).with_name("hardware") / "cr3_o6.toml"
 D435_CAMERA_NAMES = (
     "base_0_rgb",
     "left_wrist_0_rgb",
@@ -306,7 +306,7 @@ def _load_d435(table: Mapping[str, Any]) -> D435Config:
 
 
 def load_hardware_config(path: str | Path | None = None) -> HardwareConfig:
-    """Load and validate hardware.toml, defaulting to config/hardware.toml."""
+    """Load and validate a hardware profile, defaulting to config/hardware/cr3_o6.toml."""
 
     config_path = Path(path) if path is not None else DEFAULT_CONFIG_PATH
     config_path = config_path.expanduser().resolve()
