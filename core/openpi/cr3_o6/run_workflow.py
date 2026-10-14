@@ -37,6 +37,15 @@ from core.openpi.cr3_o6.replay_trajectory import (  # noqa: E402
     load_trajectory,
     replay_trajectory,
 )
+from core.openpi.cr3_o6.replay_ptp_dataset import (  # noqa: E402
+    DEFAULT_INITIAL_MOVE_DURATION_S as PTP_INITIAL_MOVE_DURATION_S,
+    DEFAULT_MAX_JOINT_SPEED_RAD_S as PTP_MAX_JOINT_SPEED_RAD_S,
+    _check_joint_steps,
+    _joint_targets,
+    _episode_paths as _ptp_episode_paths,
+    load_ptp_trajectory,
+    replay_trajectory as replay_ptp_trajectory,
+)
 
 
 LOGGER = logging.getLogger("cr3_o6_workflow")
@@ -77,6 +86,24 @@ def _validate_plan(plan: Any) -> list[dict[str, Any]]:
                 or time_scale <= 0
             ):
                 raise ValueError(f"Replay task {index} requires time_scale > 0")
+        elif kind == "ptp":
+            data_dir = task.get("data_dir")
+            control_space = task.get("control_space", "joint")
+            repeat = task.get("repeat", 1)
+            time_scale = task.get("time_scale", 1.0)
+            if not isinstance(data_dir, str) or not data_dir.strip():
+                raise ValueError(f"PTP task {index} requires data_dir")
+            if control_space not in ("joint", "tcp"):
+                raise ValueError(f"PTP task {index} control_space must be 'joint' or 'tcp'")
+            if isinstance(repeat, bool) or not isinstance(repeat, int) or repeat < 1:
+                raise ValueError(f"PTP task {index} requires repeat >= 1")
+            if (
+                isinstance(time_scale, bool)
+                or not isinstance(time_scale, (int, float))
+                or not math.isfinite(time_scale)
+                or time_scale <= 0
+            ):
+                raise ValueError(f"PTP task {index} requires time_scale > 0")
         else:
             raise ValueError(f"Task {index} has unsupported type {kind!r}")
     return tasks
@@ -107,6 +134,33 @@ def _load_replay_task(task: dict[str, Any], hardware: Any):
         for episode_index in indices
     ]
     return trajectories, int(task.get("repeat", 1)), float(task.get("time_scale", 1.0))
+
+
+def _load_ptp_task(task: dict[str, Any]):
+    dataset_dir = Path(task["data_dir"]).expanduser()
+    if not dataset_dir.is_absolute():
+        dataset_dir = REPO_ROOT / dataset_dir
+    dataset_dir = dataset_dir.resolve()
+    episodes = _ptp_episode_paths(dataset_dir)
+    if not episodes:
+        raise FileNotFoundError(f"No parquet episodes found under {dataset_dir / 'data'}")
+    control_space = str(task.get("control_space", "joint"))
+    trajectories = [
+        load_ptp_trajectory(dataset_dir, episode_index, control_space=control_space)
+        for episode_index, _path in episodes
+    ]
+    LOGGER.info(
+        "PTP dataset %s: %d complete trajectories in order %s",
+        dataset_dir,
+        len(trajectories),
+        [trajectory.episode_index for trajectory in trajectories],
+    )
+    return (
+        trajectories,
+        control_space,
+        int(task.get("repeat", 1)),
+        float(task.get("time_scale", 1.0)),
+    )
 
 
 def _run_policy_task(
@@ -199,6 +253,53 @@ def _run_replay_task(
             )
 
 
+def _run_ptp_task(
+    trajectories: list[Any],
+    control_space: str,
+    robot: Any,
+    *,
+    repeat: int,
+    time_scale: float,
+) -> None:
+    from vendor.nrc_interface.interface import SERVO_RUNNING
+
+    converted_trajectories = []
+    for trajectory in trajectories:
+        joint_targets = _joint_targets(trajectory, robot, control_space=control_space)
+        _check_joint_steps(joint_targets, max_ik_step_rad=0.5)
+        converted_trajectories.append((trajectory, joint_targets))
+    for repetition in range(repeat):
+        LOGGER.info("PTP dataset pass %d/%d", repetition + 1, repeat)
+        for trajectory, joint_targets in converted_trajectories:
+            if robot.get_servo_state() != SERVO_RUNNING:
+                raise RuntimeError(
+                    "CR3 left the running state before PTP replay; "
+                    "workflow halted without attempting recovery motion"
+                )
+            LOGGER.info(
+                "PTP episode %d in %s space; O6 will not be commanded",
+                trajectory.episode_index,
+                control_space,
+            )
+            from core.openpi.cr3_o6.replay_ptp_dataset import _move_smoothly
+
+            _move_smoothly(
+                robot,
+                joint_targets[0],
+                duration_s=PTP_INITIAL_MOVE_DURATION_S,
+                max_joint_speed_rad_s=PTP_MAX_JOINT_SPEED_RAD_S,
+                label=f"first recorded target of episode {trajectory.episode_index}",
+            )
+            replay_ptp_trajectory(
+                trajectory,
+                joint_targets,
+                robot,
+                time_scale=time_scale,
+                max_joint_speed_rad_s=PTP_MAX_JOINT_SPEED_RAD_S,
+                disable_slew_limit=False,
+            )
+
+
 def run_workflow(
     *,
     tasks: list[dict[str, Any]],
@@ -207,14 +308,18 @@ def run_workflow(
     policy_port: int,
 ) -> int:
     hardware = load_hardware_config(config_path)
-    if hardware.hand.model.upper() != "O6" or hardware.hand.joint_count != 6:
+    needs_hand = any(task["type"] in ("policy", "replay") for task in tasks)
+    if needs_hand and (hardware.hand.model.upper() != "O6" or hardware.hand.joint_count != 6):
         raise ValueError("CR3/O6 workflow requires a six-joint O6 hand")
 
     policy_tasks = [task for task in tasks if task["type"] == "policy"]
     replay_cache: dict[int, tuple[list[Any], int, float]] = {}
+    ptp_cache: dict[int, tuple[Any, str, int, float]] = {}
     for index, task in enumerate(tasks):
         if task["type"] == "replay":
             replay_cache[index] = _load_replay_task(task, hardware)
+        elif task["type"] == "ptp":
+            ptp_cache[index] = _load_ptp_task(task)
 
     policy = None
     cameras = None
@@ -231,8 +336,8 @@ def run_workflow(
         )
         cameras = hardware.create_d435_interface()
 
-    _patch_pymodbus_slave_argument() if hardware.hand.transport == "rs485" else None
-    LinkerHandApi = _load_hand_api()
+    if needs_hand and hardware.hand.transport == "rs485":
+        _patch_pymodbus_slave_argument()
     robot = hardware.create_nrc_interface()
     hand_api = None
     servo_opened = False
@@ -243,13 +348,15 @@ def run_workflow(
     try:
         LOGGER.info("Connecting CR3 %s from %s", hardware.nrc.ip, hardware.source)
         robot.connect()
-        hand_kwargs = hardware.hand.api_kwargs()
-        endpoint = hand_kwargs["modbus"] if hand_kwargs["modbus"] != "None" else hand_kwargs["can"]
-        LOGGER.info("Connecting %s LinkerHand O6 via %s", hardware.hand.side, endpoint)
-        hand_api = LinkerHandApi(**hand_kwargs)
-        if hand_api.hand_type != hardware.hand.side or str(hand_api.hand_joint).upper() != "O6":
-            raise RuntimeError(f"Unexpected LinkerHand: {hand_api.hand_type}/{hand_api.hand_joint}")
-        hand_api.set_speed([100] * hardware.hand.joint_count)
+        if needs_hand:
+            LinkerHandApi = _load_hand_api()
+            hand_kwargs = hardware.hand.api_kwargs()
+            endpoint = hand_kwargs["modbus"] if hand_kwargs["modbus"] != "None" else hand_kwargs["can"]
+            LOGGER.info("Connecting %s LinkerHand O6 via %s", hardware.hand.side, endpoint)
+            hand_api = LinkerHandApi(**hand_kwargs)
+            if hand_api.hand_type != hardware.hand.side or str(hand_api.hand_joint).upper() != "O6":
+                raise RuntimeError(f"Unexpected LinkerHand: {hand_api.hand_type}/{hand_api.hand_joint}")
+            hand_api.set_speed([100] * hardware.hand.joint_count)
 
         if cameras is not None:
             cameras.connect()
@@ -279,12 +386,13 @@ def run_workflow(
 
         robot.open_servoj()
         servo_opened = True
-        _move_to_initial_position(
-            robot,
-            hand_api,
-            DEFAULT_INITIAL_MOVE_DURATION_S,
-            MAX_JOINT_TARGET_SPEED_RAD_S,
-        )
+        if needs_hand:
+            _move_to_initial_position(
+                robot,
+                hand_api,
+                DEFAULT_INITIAL_MOVE_DURATION_S,
+                MAX_JOINT_TARGET_SPEED_RAD_S,
+            )
 
         for index, task in enumerate(tasks, start=1):
             if robot.get_servo_state() != SERVO_RUNNING:
@@ -300,7 +408,7 @@ def run_workflow(
             )
             if task["type"] == "policy":
                 _run_policy_task(task, policy, source, robot, hand_api)
-            else:
+            elif task["type"] == "replay":
                 trajectories, repeat, time_scale = replay_cache[index - 1]
                 _run_replay_task(
                     trajectories,
@@ -309,6 +417,15 @@ def run_workflow(
                     repeat=repeat,
                     time_scale=time_scale,
                     max_joint_speed_rad_s=DEFAULT_MAX_JOINT_SPEED_RAD_S,
+                )
+            else:
+                trajectory, control_space, repeat, time_scale = ptp_cache[index - 1]
+                _run_ptp_task(
+                    trajectory,
+                    control_space,
+                    robot,
+                    repeat=repeat,
+                    time_scale=time_scale,
                 )
             state = robot.get_servo_state()
             if state != SERVO_RUNNING:
@@ -325,16 +442,17 @@ def run_workflow(
     finally:
         if servo_opened:
             try:
-                if robot.get_servo_state() == SERVO_RUNNING:
-                    _move_to_initial_position(
-                        robot,
-                        hand_api,
-                        DEFAULT_INITIAL_MOVE_DURATION_S,
-                        MAX_JOINT_TARGET_SPEED_RAD_S,
-                    )
-                else:
-                    LOGGER.error("Skipping final home move because CR3 is not in running state")
-                    cleanup_failed = True
+                if needs_hand:
+                    if robot.get_servo_state() == SERVO_RUNNING:
+                        _move_to_initial_position(
+                            robot,
+                            hand_api,
+                            DEFAULT_INITIAL_MOVE_DURATION_S,
+                            MAX_JOINT_TARGET_SPEED_RAD_S,
+                        )
+                    else:
+                        LOGGER.error("Skipping final home move because CR3 is not in running state")
+                        cleanup_failed = True
             except Exception:
                 LOGGER.exception("Failed to return CR3/O6 to the initial position")
                 cleanup_failed = True

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import ast
 from dataclasses import dataclass
 import html
 import json
@@ -41,7 +42,9 @@ from PySide6.QtWidgets import (
 ROOT = Path(__file__).resolve().parents[2]
 HARDWARE_DIR = ROOT / "config" / "hardware"
 CHECKPOINTS_DIR = ROOT / "checkpoints"
+OPENPI_CONFIG_FILE = ROOT / "module" / "openpi" / "src" / "openpi" / "training" / "config.py"
 DEFAULT_DATASET = ROOT / "dataset" / "replay" / "teleop_once"
+DEFAULT_PTP_DATASET = ROOT / "dataset" / "replay" / "ptp_rectangle_v21"
 TASKS_DIR = ROOT / "tasks"
 WORKFLOW_VERSION = 1
 
@@ -57,32 +60,56 @@ def _episode_files(dataset_dir: Path) -> list[tuple[int, Path]]:
     return sorted(episodes, key=lambda item: (item[0], str(item[1])))
 
 
-def _discover_policy_checkpoints(checkpoints_dir: Path = CHECKPOINTS_DIR) -> dict[str, Path]:
-    """Map each checkpoint/config directory name to its newest params checkpoint."""
+def _discover_policy_configs(config_file: Path = OPENPI_CONFIG_FILE) -> list[str]:
+    """Read CR3/O6-compatible registered TrainConfig names without importing OpenPI/JAX."""
 
-    policies: dict[str, Path] = {}
-    if not checkpoints_dir.is_dir():
-        return policies
+    try:
+        module = ast.parse(config_file.read_text())
+    except (OSError, SyntaxError) as exc:
+        raise RuntimeError(f"无法读取 OpenPI 配置注册表：{config_file}: {exc}") from exc
 
-    for policy_dir in sorted(path for path in checkpoints_dir.iterdir() if path.is_dir()):
-        candidates = {params_dir.parent.resolve() for params_dir in policy_dir.rglob("params")
-                      if params_dir.is_dir()}
-        if not candidates:
+    config_list = None
+    for node in module.body:
+        if isinstance(node, ast.Assign) and any(
+            isinstance(target, ast.Name) and target.id == "_CONFIGS" for target in node.targets
+        ):
+            config_list = node.value
+            break
+    if not isinstance(config_list, (ast.List, ast.Tuple)):
+        raise RuntimeError(f"在 {config_file} 中找不到静态 _CONFIGS 列表")
+
+    names = []
+    for item in config_list.elts:
+        if not isinstance(item, ast.Call):
             continue
+        data_value = next((keyword.value for keyword in item.keywords if keyword.arg == "data"), None)
+        if not (
+            isinstance(data_value, ast.Call)
+            and isinstance(data_value.func, ast.Name)
+            and data_value.func.id == "LeRobotCR3O6DataConfig"
+        ):
+            continue
+        for keyword in item.keywords:
+            if keyword.arg == "name" and isinstance(keyword.value, ast.Constant):
+                if isinstance(keyword.value.value, str):
+                    names.append(keyword.value.value)
+                break
+    if not names:
+        raise RuntimeError(f"未能从 {config_file} 中读取任何 CR3/O6 兼容的 TrainConfig")
+    return list(dict.fromkeys(names))
 
-        numeric_candidates = [path for path in candidates if path.name.isdecimal()]
-        if numeric_candidates:
-            # Checkpoint steps are directory names such as 90000 and 100000;
-            # compare them numerically so 100000 correctly sorts after 90000.
-            policies[policy_dir.name] = max(
-                numeric_candidates,
-                key=lambda path: (int(path.name), path.as_posix()),
-            )
-        else:
-            # Keep non-step layouts discoverable, though numbered checkpoints
-            # are preferred whenever they exist.
-            policies[policy_dir.name] = max(candidates, key=lambda path: path.as_posix())
-    return policies
+
+def _numeric_checkpoint_dirs(parent: Path) -> list[Path]:
+    if not parent.is_dir():
+        return []
+    return sorted(
+        (
+            path.resolve()
+            for path in parent.iterdir()
+            if path.is_dir() and path.name.isdecimal() and (path / "params").is_dir()
+        ),
+        key=lambda path: (int(path.name), path.as_posix()),
+    )
 
 
 def _serialize_task(task: Task) -> dict[str, Any]:
@@ -103,6 +130,20 @@ def _serialize_task(task: Task) -> dict[str, Any]:
             "type": "replay",
             "description": task.description,
             "dataset_dir": stored_path,
+            "repeat_count": task.repeat_count,
+            "time_scale": task.time_scale,
+        }
+    if task.kind == "ptp" and task.dataset_dir is not None:
+        dataset_dir = task.dataset_dir.expanduser().resolve()
+        try:
+            stored_path = dataset_dir.relative_to(ROOT).as_posix()
+        except ValueError:
+            stored_path = str(dataset_dir)
+        return {
+            "type": "ptp",
+            "description": task.description,
+            "dataset_dir": stored_path,
+            "control_space": task.control_space,
             "repeat_count": task.repeat_count,
             "time_scale": task.time_scale,
         }
@@ -172,6 +213,44 @@ def _deserialize_workflow(data: Any) -> list[Task]:
             )
             continue
 
+        if kind == "ptp":
+            raw_path = raw.get("dataset_dir")
+            control_space = raw.get("control_space", "joint")
+            repeat = raw.get("repeat_count", 1)
+            time_scale = raw.get("time_scale", 1.0)
+            if not isinstance(raw_path, str) or not raw_path.strip():
+                raise ValueError(f"任务 {index} 缺少走点数据集路径")
+            if control_space not in ("joint", "tcp"):
+                raise ValueError(f"任务 {index} 的控制空间必须是 joint 或 tcp")
+            if isinstance(repeat, bool) or not isinstance(repeat, int) or not 1 <= repeat <= 10_000:
+                raise ValueError(f"任务 {index} 的播放次数必须在 1 到 10000 之间")
+            if (
+                isinstance(time_scale, bool)
+                or not isinstance(time_scale, (int, float))
+                or not math.isfinite(time_scale)
+                or not 0.1 <= time_scale <= 10.0
+            ):
+                raise ValueError(f"任务 {index} 的速度倍率必须在 0.1 到 10 之间")
+            dataset_dir = Path(raw_path).expanduser()
+            if not dataset_dir.is_absolute():
+                dataset_dir = ROOT / dataset_dir
+            dataset_dir = dataset_dir.resolve()
+            if not description or description == f"任务 {index}":
+                description = (
+                    f"走点重播 · {dataset_dir.name} · 全部轨迹 × {repeat} 遍 · {control_space}"
+                )
+            tasks.append(
+                Task(
+                    "ptp",
+                    description,
+                    dataset_dir=dataset_dir,
+                    repeat_count=repeat,
+                    time_scale=float(time_scale),
+                    control_space=control_space,
+                )
+            )
+            continue
+
         raise ValueError(f"任务 {index} 类型不支持：{kind!r}")
     return tasks
 
@@ -185,6 +264,7 @@ class Task:
     dataset_dir: Path | None = None
     repeat_count: int = 1
     time_scale: float = 1.0
+    control_space: str = "joint"
 
 
 class TaskDialog(QDialog):
@@ -196,42 +276,56 @@ class TaskDialog(QDialog):
         self.kind = QComboBox()
         self.kind.addItem("PI05 模型推理", "policy")
         self.kind.addItem("重播数据集轨迹", "replay")
+        self.kind.addItem("重播走点轨迹（CR3）", "ptp")
         form.addRow("任务类型", self.kind)
 
         self.prompt = QLineEdit("Pick up the motor and place it on the right side with the protruding side facing left.")
-        form.addRow("推理指令", self.prompt)
+        self.prompt_label = QLabel("推理指令")
+        form.addRow(self.prompt_label, self.prompt)
         self.duration = QDoubleSpinBox()
         self.duration.setRange(0.5, 3600.0)
         self.duration.setSingleStep(1.0)
         self.duration.setValue(25.0)
         self.duration.setSuffix(" 秒")
-        form.addRow("最长运行时间", self.duration)
+        self.duration_label = QLabel("最长运行时间")
+        form.addRow(self.duration_label, self.duration)
 
         dataset_row = QWidget()
         dataset_layout = QHBoxLayout(dataset_row)
         dataset_layout.setContentsMargins(0, 0, 0, 0)
         self.dataset = QLineEdit(str(DEFAULT_DATASET))
+        self.dataset_row = dataset_row
+        self.dataset_label = QLabel("数据集目录")
         browse = QPushButton("选择…")
         browse.clicked.connect(self._browse_dataset)
         dataset_layout.addWidget(self.dataset)
         dataset_layout.addWidget(browse)
-        form.addRow("数据集目录", dataset_row)
+        form.addRow(self.dataset_label, dataset_row)
+
+        self.control_space = QComboBox()
+        self.control_space.addItem("TCP 空间（target.tcp_pose）", "tcp")
+        self.control_space.addItem("关节空间（action）", "joint")
+        self.control_space_label = QLabel("走点控制空间")
+        form.addRow(self.control_space_label, self.control_space)
 
         self.repeat_count = QSpinBox()
         self.repeat_count.setRange(1, 10_000)
         self.repeat_count.setValue(1)
-        form.addRow("完整数据集播放次数", self.repeat_count)
+        self.repeat_label = QLabel("完整数据集播放次数")
+        form.addRow(self.repeat_label, self.repeat_count)
+        self.time_scale_label = QLabel("重播速度倍率")
         self.time_scale = QDoubleSpinBox()
         self.time_scale.setRange(0.1, 10.0)
         self.time_scale.setSingleStep(0.1)
         self.time_scale.setValue(1.0)
-        form.addRow("重播速度倍率", self.time_scale)
+        form.addRow(self.time_scale_label, self.time_scale)
 
         self.kind.currentIndexChanged.connect(self._update_fields)
         buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
         buttons.accepted.connect(self.accept)
         buttons.rejected.connect(self.reject)
         form.addRow(buttons)
+        self._last_kind = self.kind.currentData()
         self._update_fields()
 
     def _browse_dataset(self) -> None:
@@ -240,12 +334,33 @@ class TaskDialog(QDialog):
             self.dataset.setText(directory)
 
     def _update_fields(self) -> None:
-        is_policy = self.kind.currentData() == "policy"
+        kind = self.kind.currentData()
+        is_policy = kind == "policy"
+        is_replay = kind in ("replay", "ptp")
+        is_ptp = kind == "ptp"
+        if kind != self._last_kind:
+            current_path = Path(self.dataset.text()).expanduser()
+            if current_path in (DEFAULT_DATASET, DEFAULT_PTP_DATASET):
+                self.dataset.setText(str(DEFAULT_PTP_DATASET if is_ptp else DEFAULT_DATASET))
+            self._last_kind = kind
         self.prompt.setEnabled(is_policy)
+        self.prompt.setVisible(is_policy)
+        self.prompt_label.setVisible(is_policy)
         self.duration.setEnabled(is_policy)
-        self.dataset.setEnabled(not is_policy)
-        self.repeat_count.setEnabled(not is_policy)
-        self.time_scale.setEnabled(not is_policy)
+        self.duration.setVisible(is_policy)
+        self.duration_label.setVisible(is_policy)
+        self.dataset_row.setVisible(is_replay)
+        self.dataset_label.setVisible(is_replay)
+        self.dataset.setEnabled(is_replay)
+        self.repeat_count.setEnabled(is_replay)
+        self.repeat_count.setVisible(is_replay)
+        self.repeat_label.setVisible(is_replay)
+        self.repeat_label.setText("完整走点数据集播放次数" if is_ptp else "完整数据集播放次数")
+        self.time_scale.setEnabled(is_replay)
+        self.time_scale.setVisible(is_replay)
+        self.time_scale_label.setVisible(is_replay)
+        self.control_space.setVisible(is_ptp)
+        self.control_space_label.setVisible(is_ptp)
 
     def task(self) -> Task:
         if self.kind.currentData() == "policy":
@@ -265,6 +380,17 @@ class TaskDialog(QDialog):
                 f"data/chunk-*/episode_*.parquet 的数据集目录：{dataset}"
             )
         repeat_count = self.repeat_count.value()
+        if self.kind.currentData() == "ptp":
+            control_space = self.control_space.currentData()
+            return Task(
+                "ptp",
+                f"走点重播 · {dataset.name} · {len(episodes)} 条轨迹 × "
+                f"{repeat_count} 遍 · {control_space}",
+                dataset_dir=dataset,
+                repeat_count=repeat_count,
+                time_scale=self.time_scale.value(),
+                control_space=control_space,
+            )
         return Task(
             "replay",
             f"重播 · {dataset.name} · {len(episodes)} 条轨迹 × {repeat_count} 遍",
@@ -299,26 +425,35 @@ class MainWindow(QMainWindow):
         selection_layout.addRow("机器人系统", self.hardware)
 
         self.policy_config = QComboBox()
-        self.policy_checkpoints = _discover_policy_checkpoints()
-        if self.policy_checkpoints:
-            for policy_name in self.policy_checkpoints:
-                self.policy_config.addItem(policy_name, policy_name)
+        try:
+            self.policy_configs = _discover_policy_configs()
+        except RuntimeError as exc:
+            self.policy_configs = []
+            self._config_load_error = str(exc)
         else:
-            self.policy_config.addItem("未在 checkpoints/ 中找到有效模型", "")
+            self._config_load_error = None
+        if self.policy_configs:
+            for config_name in self.policy_configs:
+                self.policy_config.addItem(config_name, config_name)
+        else:
+            self.policy_config.addItem("未找到 CR3/O6 OpenPI 配置", "")
         selection_layout.addRow("策略模型", self.policy_config)
 
         checkpoint_row = QWidget()
         checkpoint_layout = QHBoxLayout(checkpoint_row)
         checkpoint_layout.setContentsMargins(0, 0, 0, 0)
-        default_policy = self.policy_config.currentData()
-        default_checkpoint = self.policy_checkpoints.get(default_policy, CHECKPOINTS_DIR)
-        self.checkpoint = QLineEdit(str(default_checkpoint))
-        self.checkpoint_browse_button = QPushButton("选择…")
-        self.checkpoint_browse_button.clicked.connect(self._browse_checkpoint)
+        self.experiment_combo = QComboBox()
+        self.experiment_combo.setToolTip("选择训练时的 --exp-name 实验目录")
+        self.checkpoint_step_combo = QComboBox()
+        self.checkpoint_step_combo.setToolTip("默认选中该实验下最大数值的 checkpoint，也可手动切换")
+        checkpoint_layout.addWidget(QLabel("实验"))
+        checkpoint_layout.addWidget(self.experiment_combo, 2)
+        checkpoint_layout.addWidget(QLabel("Checkpoint"))
+        checkpoint_layout.addWidget(self.checkpoint_step_combo, 1)
+        selection_layout.addRow("训练结果", checkpoint_row)
         self.policy_config.currentIndexChanged.connect(self._policy_changed)
-        checkpoint_layout.addWidget(self.checkpoint)
-        checkpoint_layout.addWidget(self.checkpoint_browse_button)
-        selection_layout.addRow("Checkpoint", checkpoint_row)
+        self.experiment_combo.currentIndexChanged.connect(self._experiment_changed)
+        self._policy_changed()
 
         server_row = QWidget()
         server_layout = QHBoxLayout(server_row)
@@ -391,15 +526,52 @@ class MainWindow(QMainWindow):
     def _log(self, message: str) -> None:
         self.log.append(message)
 
-    def _browse_checkpoint(self) -> None:
-        directory = QFileDialog.getExistingDirectory(self, "选择模型 checkpoint", self.checkpoint.text())
-        if directory:
-            self.checkpoint.setText(directory)
+    def _policy_changed(self, _index: int = -1) -> None:
+        policy_name = self.policy_config.currentData()
+        config_dir = CHECKPOINTS_DIR / policy_name if policy_name else None
 
-    def _policy_changed(self, _index: int) -> None:
-        checkpoint = self.policy_checkpoints.get(self.policy_config.currentData())
-        if checkpoint is not None:
-            self.checkpoint.setText(str(checkpoint))
+        self.experiment_combo.blockSignals(True)
+        self.experiment_combo.clear()
+        experiments = []
+        if config_dir is not None and config_dir.is_dir():
+            experiments = [
+                path.resolve()
+                for path in config_dir.iterdir()
+                if path.is_dir() and _numeric_checkpoint_dirs(path)
+            ]
+        experiments.sort(key=lambda path: path.name.casefold())
+        for experiment_dir in experiments:
+            self.experiment_combo.addItem(experiment_dir.name, str(experiment_dir))
+
+        if not self.experiment_combo.count():
+            self.experiment_combo.addItem("未找到有效训练结果", "")
+        elif experiments:
+            preferred = next(
+                (i for i in range(self.experiment_combo.count())
+                 if self.experiment_combo.itemData(i) == str((config_dir / policy_name).resolve())),
+                -1,
+            )
+            if preferred < 0:
+                newest = max(experiments, key=lambda path: path.stat().st_mtime)
+                preferred = self.experiment_combo.findData(str(newest))
+            self.experiment_combo.setCurrentIndex(preferred)
+        else:
+            self.experiment_combo.setCurrentIndex(0)
+        self.experiment_combo.blockSignals(False)
+        self._experiment_changed()
+
+    def _experiment_changed(self, _index: int = -1) -> None:
+        self.checkpoint_step_combo.blockSignals(True)
+        self.checkpoint_step_combo.clear()
+        experiment_text = self.experiment_combo.currentData()
+        steps = _numeric_checkpoint_dirs(Path(experiment_text)) if experiment_text else []
+        if not steps:
+            self.checkpoint_step_combo.addItem("无有效 checkpoint", "")
+        else:
+            for checkpoint_dir in steps:
+                self.checkpoint_step_combo.addItem(checkpoint_dir.name, str(checkpoint_dir))
+            self.checkpoint_step_combo.setCurrentIndex(len(steps) - 1)
+        self.checkpoint_step_combo.blockSignals(False)
 
     def _add_task(self) -> None:
         dialog = TaskDialog(self)
@@ -506,13 +678,22 @@ class MainWindow(QMainWindow):
     def _server_args(self) -> list[str]:
         policy_name = self.policy_config.currentData()
         if not policy_name:
-            raise ValueError(f"在 {CHECKPOINTS_DIR} 下没有发现可用模型 checkpoint")
-        checkpoint = Path(self.checkpoint.text()).expanduser()
-        if not checkpoint.is_absolute():
-            checkpoint = ROOT / checkpoint
-        checkpoint = checkpoint.resolve()
-        if not checkpoint.is_dir():
-            raise ValueError(f"Checkpoint 目录不存在：{checkpoint}")
+            raise ValueError(self._config_load_error or "没有可用的 OpenPI 策略配置")
+        checkpoint_text = self.checkpoint_step_combo.currentData()
+        if not checkpoint_text:
+            raise ValueError("所选实验中没有可用的数值 checkpoint")
+        config_dir = (CHECKPOINTS_DIR / policy_name).resolve()
+        experiment_text = self.experiment_combo.currentData()
+        if not experiment_text:
+            raise ValueError("请选择有效的训练实验（exp-name）")
+        experiment_dir = Path(experiment_text).resolve()
+        if not experiment_dir.is_relative_to(config_dir):
+            raise ValueError(f"训练结果目录不属于所选策略配置：{experiment_dir}")
+        checkpoint = Path(checkpoint_text).resolve()
+        if not checkpoint.is_relative_to(experiment_dir):
+            raise ValueError(f"Checkpoint 不属于所选训练实验：{checkpoint}")
+        if not checkpoint.is_dir() or not (checkpoint / "params").is_dir():
+            raise ValueError(f"Checkpoint 目录无效或缺少 params：{checkpoint}")
         return [
             "scripts/serve_policy.py",
             "--port",
@@ -556,8 +737,8 @@ class MainWindow(QMainWindow):
 
     def _set_model_selection_enabled(self, enabled: bool) -> None:
         self.policy_config.setEnabled(enabled)
-        self.checkpoint.setEnabled(enabled)
-        self.checkpoint_browse_button.setEnabled(enabled)
+        self.experiment_combo.setEnabled(enabled)
+        self.checkpoint_step_combo.setEnabled(enabled)
         self.port.setEnabled(enabled)
 
     def _probe_server(self) -> None:
@@ -663,6 +844,17 @@ class MainWindow(QMainWindow):
                         f"{index}. {task.description} · episode 顺序：{episode_indices} "
                         f"· 整套序列重复 {task.repeat_count} 遍"
                     )
+                elif task.kind == "ptp":
+                    episodes = _episode_files(task.dataset_dir)
+                    available = [episode_index for episode_index, _path in episodes]
+                    if not available:
+                        raise ValueError(
+                            f"数据集中已没有可重播走点轨迹：{task.dataset_dir}"
+                        )
+                    lines.append(
+                        f"{index}. {task.description} · 按编号顺序重播全部 Episode {available} "
+                        f"（{task.control_space} 空间），重复 {task.repeat_count} 遍"
+                    )
                 else:
                     lines.append(f"{index}. {task.description} · {task.prompt}")
             lines.append("\n提示：计划预览只检查配置和轨迹文件，不连接机器人，也不触发模型推理。")
@@ -696,7 +888,7 @@ class MainWindow(QMainWindow):
                     "prompt": task.prompt,
                     "duration_s": task.duration_s,
                 })
-            else:
+            elif task.kind == "replay":
                 dataset_dir = task.dataset_dir
                 if not _episode_files(dataset_dir):
                     QMessageBox.warning(
@@ -712,12 +904,38 @@ class MainWindow(QMainWindow):
                     "repeat": task.repeat_count,
                     "time_scale": task.time_scale,
                 })
+            else:
+                dataset_dir = task.dataset_dir
+                episode_indices = [index for index, _path in _episode_files(dataset_dir)]
+                if not episode_indices:
+                    QMessageBox.warning(
+                        self,
+                        "数据集无轨迹",
+                        f"数据集中没有可重播走点轨迹：{dataset_dir}",
+                    )
+                    return
+                plan_tasks.append({
+                    "type": "ptp",
+                    "name": task.description,
+                    "data_dir": str(dataset_dir),
+                    "control_space": task.control_space,
+                    "repeat": task.repeat_count,
+                    "time_scale": task.time_scale,
+                })
 
-        note = (
-            "将连接并控制真实机器人。整套序列开始时会移动到初始位姿；任务之间保持上电和 ServoJ，"
-            "每一遍数据集重播前先回初始位姿，再平滑过渡到轨迹首帧；全部任务结束后才统一清理。"
-            "如果控制器进入错误态，后续任务会停止。请确认初始位姿和现场环境安全。"
-        )
+        if any(task.kind in ("policy", "replay") for task in self.tasks):
+            note = (
+                "将连接并控制真实机器人。整套序列开始时会移动到初始位姿；任务之间保持上电和 ServoJ。"
+                "完整数据集重播前先回初始位姿，再平滑过渡到轨迹首帧；走点任务会依次过渡到每条 Episode 首点，"
+                "且不控制 O6。全部任务结束后统一清理。如果控制器进入错误态，后续任务会停止。"
+                "请确认初始位姿和现场环境安全。"
+            )
+        else:
+            note = (
+                "将控制真实 CR3。此任务流仅包含走点轨迹：不连接或控制 O6，也不先移动到统一初始位姿；"
+                "机器人会从当前位置开始，依次平滑过渡到数据集中每条 Episode 的首点并播放。"
+                "请确认目标轨迹及现场环境安全；如果控制器进入错误态，工作流会停止。"
+            )
         if QMessageBox.warning(
             self,
             "确认机器人运动",
