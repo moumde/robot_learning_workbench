@@ -11,7 +11,7 @@ Robot Learning Workbench 是一个面向机器人学习研发的基线工程。�
 
 ## 1. 环境边界
 
-本项目明确维护两套 Python 环境：
+本项目维护两套主要运行环境；GELLO 数据 Writer 另使用独立环境：
 
 | 用途 | 环境目录 | Python | 启动方式 |
 | --- | --- | --- | --- |
@@ -21,6 +21,11 @@ Robot Learning Workbench 是一个面向机器人学习研发的基线工程。�
 NRC 厂商动态库 `_nrc_host.so` 按 Python 3.12 构建，因此不要在 OpenPI 的 Python 3.11 进程中直接导入它。模型服务端和机器人客户端通过网络协议通信，两个进程可以运行在同一台机器或不同机器上。
 
 这两个环境都不应安装到工作台根目录 `.venv`，也不要使用系统 Python 执行 `pip install`。
+
+GELLO 遥操界面复用 NRC Python 3.12，V2.1/V3 Writer 分别位于
+`module/gello_writers/v21/.venv/`、`module/gello_writers/v3/.venv/`。
+OpenPI 锁定的 LeRobot 不能替代官方 V2.1 Writer；不要混装两个 Writer 版本或改动训练环境。
+安装和使用见 [GELLO 集成说明](docs/gello_cr_integration.md)。
 
 ### 1.1 硬件配置入口
 
@@ -282,6 +287,24 @@ uv pip install --python module/nrc/.venv/bin/python \
 
 策略列表读取 `module/openpi/src/openpi/training/config.py` 中使用 `LeRobotCR3O6DataConfig` 的已注册配置名。选择策略后，界面从 `checkpoints/<配置名>/` 中列出训练实验（`exp-name`）；默认优先选中同名实验（如果存在），否则选择最近更新的实验。第二个下拉框列出所选实验中的数值 checkpoint，默认选择最大值，也可手动切换。界面可选择硬件 profile，启动/停止 PI05 服务，并创建、排序、预览和执行推理、完整数据集重播、CR3 走点轨迹重播任务；走点任务按编号顺序重播数据集中的全部轨迹，支持关节/TCP 空间、次数和速度倍率。添加任务时，界面仅显示当前任务类型对应的参数。任务流可保存或读取 `tasks/` 下的 JSON 配置。整条序列由一个工作流进程持有 CR3 连接与 ServoJ；走点任务不连接或控制 O6，完整数据集重播前回初始位姿再过渡至首帧。整套任务结束后统一清理。若控制器进入错误态，后续任务会停止；启动前若已处于错误态，程序不会自动清错或上电。推理任务需设置最长时长，当前策略没有语义任务完成信号。
 
+### 3.7 GELLO 遥操与数据采集
+
+安装父 NRC 环境中的界面/硬件依赖及独立 V2.1 Writer，再执行只读配置检查：
+
+```bash
+./scripts/setup_teleop_env.sh
+./scripts/setup_gello_writer_env.sh v21
+./scripts/run_teleop.sh --check-only
+./scripts/run_teleop.sh
+```
+
+界面启动为 OFFLINE / IDLE，连接、使能和跟随均由人员明确操作。
+硬件参数复用 `config/hardware/cr3_o6.toml`，GELLO 标定、动作库、任务和安全阈值位于
+`config/teleop/gello_cr.json`。训练数据、恢复批次、命名轨迹分别位于 `dataset/train/`、
+`dataset/staging/`、`dataset/replay/trajectories/`。
+独立轨迹 CLI 默认预览，真实回放需显式 `--execute`；父 HMI 提供采集入口和共享轨迹任务。
+完整安装、配置、预览和工作流格式见 [集成说明](docs/gello_cr_integration.md)。真机联调尚未完成。
+
 ## 4. 硬件测试
 
 ### 4.1 NRC 机械臂接口测试
@@ -364,7 +387,7 @@ vendor/actuator/linkerhand-python-sdk/requirements.txt
 robot_learning_workbench/
 ├── vendor/                 # NRC、相机、末端执行器等硬件适配
 ├── config/                 # 运行时硬件配置和配置中间层
-├── teleop/                 # 遥操功能
+├── teleop/gello_cr/        # GELLO 遥操、采集和共享轨迹
 ├── hmi/                    # 数据采集、训练和部署界面
 ├── module/
 │   ├── openpi/             # OpenPI 源码，由本项目直接管理
@@ -377,6 +400,7 @@ robot_learning_workbench/
 ├── test/                   # 接口、相机和硬件测试
 ├── dataset/
 │   ├── train/              # 训练数据，不进 Git
+│   ├── staging/            # 采集和恢复批次，不进 Git
 │   └── replay/             # 回放轨迹，不进 Git
 ├── checkpoints/            # 模型权重，不进 Git
 ├── thirdparty/             # 确实需要 vendoring 的第三方代码
@@ -400,6 +424,9 @@ OpenPI 源码只维护在 `module/openpi/`，不要复制到工作台其他目�
 | `scripts/run_deloy_hmi.sh` | 启动推理部署用 PySide6 界面 |
 
 日常运行 Python 程序时，优先使用对应的启动脚本，不要直接调用系统 `python`。这可以避免 Python 版本、当前工作目录和动态库搜索路径不一致。
+
+GELLO 入口为 `scripts/run_teleop.sh`、`scripts/run_gello_replay.sh`，安装入口为
+`scripts/setup_teleop_env.sh` 和 `scripts/setup_gello_writer_env.sh`；各脚本支持 `--help`。
 
 ## 7. 协同开发规则
 

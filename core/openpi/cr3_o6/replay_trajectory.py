@@ -16,19 +16,17 @@ parquet file; timestamps control replay timing.
 from __future__ import annotations
 
 import argparse
-from dataclasses import dataclass
 import functools
 import inspect
-import json
 import logging
 import math
-from pathlib import Path
 import sys
 import time
+from dataclasses import dataclass
+from pathlib import Path
 from typing import Any
 
 import numpy as np
-
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 LINKERHAND_SDK_ROOT = REPO_ROOT / "vendor" / "actuator" / "linkerhand-python-sdk"
@@ -37,8 +35,12 @@ if str(REPO_ROOT) not in sys.path:
 if str(LINKERHAND_SDK_ROOT) not in sys.path:
     sys.path.insert(0, str(LINKERHAND_SDK_ROOT))
 
-from config.hardware import HardwareConfig, load_hardware_config  # noqa: E402
-
+from config.hardware import load_hardware_config  # noqa: E402
+from core.trajectory_bridge import (  # noqa: E402
+    episode_paths,
+    joint_action_arrays,
+    load_shared_trajectory,
+)
 
 LOGGER = logging.getLogger("cr3_o6_trajectory_replay")
 
@@ -66,15 +68,6 @@ class Trajectory:
         return float(self.timestamps[-1] - self.timestamps[0])
 
 
-def _load_fps(dataset_dir: Path) -> float:
-    try:
-        info = json.loads((dataset_dir / "meta" / "info.json").read_text())
-        fps = float(info.get("fps", CONTROL_HZ))
-    except (OSError, ValueError, TypeError):
-        fps = CONTROL_HZ
-    return fps if math.isfinite(fps) and fps > 0 else CONTROL_HZ
-
-
 def _episode_path(dataset_dir: Path, episode_index: int) -> Path:
     if episode_index < 0:
         raise ValueError("--episode-index must be non-negative")
@@ -92,83 +85,32 @@ def _episode_path(dataset_dir: Path, episode_index: int) -> Path:
 
 
 def _episode_paths(dataset_dir: Path) -> list[tuple[int, Path]]:
-    paths = (dataset_dir / "data").glob("chunk-*/episode_*.parquet")
-    episodes = []
-    for path in paths:
-        try:
-            episode_index = int(path.stem.removeprefix("episode_"))
-        except ValueError:
-            continue
-        episodes.append((episode_index, path))
-    return sorted(episodes, key=lambda item: (item[0], str(item[1])))
+    return episode_paths(dataset_dir)
 
 
 def load_trajectory(
     dataset_dir: Path, episode_index: int, *, hand_min: int = 0, hand_max: int = 255
 ) -> Trajectory:
-    """Load and validate one LeRobot episode without importing hardware SDKs."""
+    """Read absolute-joint V2.1/V3 data without loading hardware SDKs.
 
+    TCP delta recordings, masks and planned trajectories use the shared
+    workflow task, which retains their semantics inside the common Player.
+    """
     dataset_dir = Path(dataset_dir).expanduser().resolve()
-    try:
-        import pandas as pd
-    except ImportError as exc:
-        raise RuntimeError("Parquet replay requires pandas and pyarrow; run setup_nrc_env.sh") from exc
-
-    source = _episode_path(dataset_dir, episode_index)
-    try:
-        table = pd.read_parquet(source)
-    except Exception as exc:
-        raise RuntimeError(f"Could not read trajectory parquet {source}: {exc}") from exc
-
-    required = {"action", "timestamp", "frame_index"}
-    missing = required - set(table.columns)
-    if missing:
-        raise ValueError(f"Trajectory is missing columns: {sorted(missing)}")
-    table = table.sort_values("frame_index").reset_index(drop=True)
-    if table.empty:
-        raise ValueError("Trajectory is empty")
-    if "episode_index" in table.columns:
-        episode_indices = np.asarray(table["episode_index"], dtype=np.int64)
-        if np.any(episode_indices != episode_index):
-            raise ValueError(f"{source} contains an unexpected episode_index")
-
-    try:
-        actions = np.stack(
-            [np.asarray(value, dtype=np.float64).reshape(-1) for value in table["action"]]
-        )
-    except (TypeError, ValueError) as exc:
-        raise ValueError(f"Could not parse the action column in {source}") from exc
-    if actions.shape != (len(table), ACTION_DIM):
-        raise ValueError(f"action must have shape [N, {ACTION_DIM}], got {actions.shape}")
-    if not np.all(np.isfinite(actions)):
-        raise ValueError("Action column contains NaN or Inf")
+    value = load_shared_trajectory(dataset_dir, episode_index)
+    actions, timestamps = joint_action_arrays(value)
     if np.any((actions[:, 6:] < hand_min) | (actions[:, 6:] > hand_max)):
         raise ValueError(f"O6 actions are outside the configured range [{hand_min}, {hand_max}]")
-
-    timestamps = np.asarray(table["timestamp"], dtype=np.float64)
-    if timestamps.shape != (len(actions),) or not np.all(np.isfinite(timestamps)):
-        raise ValueError("timestamp must be a finite one-dimensional column")
-    if np.any(np.diff(timestamps) < 0):
-        raise ValueError("timestamps must be monotonically increasing")
-
-    fps = _load_fps(dataset_dir)
-    max_recorded_speed = (
-        float(np.max(np.abs(np.diff(actions[:, :6], axis=0))) * fps)
-        if len(actions) > 1
-        else 0.0
-    )
+    source = _episode_path(dataset_dir, episode_index)
     LOGGER.info(
         "Loaded episode %d: %d frames, %.2f s at %.2f fps, source=%s",
         episode_index,
         len(actions),
-        float(timestamps[-1] - timestamps[0]),
-        fps,
+        value.metadata.duration_s,
+        value.metadata.fps,
         source,
     )
-    LOGGER.info("Recorded max CR3 target change: %.3f rad/s", max_recorded_speed)
-    LOGGER.info("First action: %s", np.round(actions[0], 4).tolist())
-    LOGGER.info("Last action:  %s", np.round(actions[-1], 4).tolist())
-    return Trajectory(actions, timestamps, episode_index, source, fps)
+    return Trajectory(actions, timestamps, episode_index, source, value.metadata.fps)
 
 
 def _patch_pymodbus_slave_argument() -> None:
@@ -203,7 +145,9 @@ def _load_hand_api():
     try:
         from LinkerHand.linker_hand_api import LinkerHandApi
     except ImportError as exc:
-        raise RuntimeError(f"Could not import the vendored LinkerHand SDK at {LINKERHAND_SDK_ROOT}") from exc
+        raise RuntimeError(
+            f"Could not import the vendored LinkerHand SDK at {LINKERHAND_SDK_ROOT}"
+        ) from exc
     return LinkerHandApi
 
 
@@ -385,17 +329,31 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument("--transport", choices=("rs485", "can"), default=None)
     parser.add_argument("--modbus", default=None, help="Override hand.linkerhand.modbus")
     parser.add_argument("--can", default=None, help="Override hand.linkerhand.can")
-    parser.add_argument("--preview-only", action="store_true", help="Load and summarize; do not connect hardware")
-    parser.add_argument("--confirm-motion", action="store_true", help="Required for real hardware movement")
+    parser.add_argument(
+        "--preview-only", action="store_true", help="Load and summarize; do not connect hardware"
+    )
+    parser.add_argument(
+        "--confirm-motion", action="store_true", help="Required for real hardware movement"
+    )
     parser.add_argument("--no-auto-power-on", action="store_true")
-    parser.add_argument("--time-scale", type=float, default=1.0, help="1.0 uses recorded timestamps")
-    parser.add_argument("--max-joint-speed-rad-s", type=float, default=DEFAULT_MAX_JOINT_SPEED_RAD_S)
+    parser.add_argument(
+        "--time-scale", type=float, default=1.0, help="1.0 uses recorded timestamps"
+    )
+    parser.add_argument(
+        "--max-joint-speed-rad-s", type=float, default=DEFAULT_MAX_JOINT_SPEED_RAD_S
+    )
     parser.add_argument("--disable-slew-limit", action="store_true")
     parser.add_argument("--o6-speed", type=int, default=DEFAULT_O6_SPEED)
-    parser.add_argument("--initial-move-duration-s", type=float, default=DEFAULT_INITIAL_MOVE_DURATION_S)
-    parser.add_argument("--first-action-move-duration-s", type=float, default=DEFAULT_FIRST_ACTION_MOVE_DURATION_S)
     parser.add_argument(
-        "--repeat", type=int, default=1,
+        "--initial-move-duration-s", type=float, default=DEFAULT_INITIAL_MOVE_DURATION_S
+    )
+    parser.add_argument(
+        "--first-action-move-duration-s", type=float, default=DEFAULT_FIRST_ACTION_MOVE_DURATION_S
+    )
+    parser.add_argument(
+        "--repeat",
+        type=int,
+        default=1,
         help="Number of times to play the selected episode or complete dataset",
     )
     parser.add_argument("--verbose", action="store_true")
@@ -479,11 +437,20 @@ def main() -> int:
         try:
             LOGGER.info("Connecting CR3 %s from %s", hardware.nrc.ip, hardware.source)
             robot.connect()
-            hand_endpoint = hand_kwargs["modbus"] if hand_kwargs["modbus"] != "None" else hand_kwargs["can"]
-            LOGGER.info("Connecting %s LinkerHand %s via %s", hardware.hand.side, hardware.hand.model, hand_endpoint)
+            hand_endpoint = (
+                hand_kwargs["modbus"] if hand_kwargs["modbus"] != "None" else hand_kwargs["can"]
+            )
+            LOGGER.info(
+                "Connecting %s LinkerHand %s via %s",
+                hardware.hand.side,
+                hardware.hand.model,
+                hand_endpoint,
+            )
             hand_api = LinkerHandApi(**hand_kwargs)
             if hand_api.hand_type != hardware.hand.side or str(hand_api.hand_joint).upper() != "O6":
-                raise RuntimeError(f"Unexpected LinkerHand: {hand_api.hand_type}/{hand_api.hand_joint}")
+                raise RuntimeError(
+                    f"Unexpected LinkerHand: {hand_api.hand_type}/{hand_api.hand_joint}"
+                )
             hand_api.set_speed([args.o6_speed] * hardware.hand.joint_count)
 
             from vendor.nrc_interface.interface import SERVO_RUNNING

@@ -1,0 +1,463 @@
+{
+  "version": 1,
+  "master": {
+    "type": "gello"
+  },
+  "robot": {
+    "robot_num": 1,
+    "motion_mode": "servoj",
+    "movej_velocity": 60.0,
+    "movej_acc": 90.0,
+    "movej_dec": 46.0,
+    "movej_period_s": 0.1,
+    "movej_low_latency": false,
+    "movej_max_segment_deg": 2.0,
+    "movej_duplicate_deadband_deg": 0.15,
+    "safety_max_command_step_rad": 2.6179938779914944,
+    "safety_max_command_speed_rad_s": 40.0,
+    "safety_speed_violation_cycles": 3,
+    "safety_max_tracking_error_rad": 2.356194490192345,
+    "sdk_root": "../../vendor/nrc_interface/nrc_linux_x86_64"
+  },
+  "roarm": {
+    "port": "/dev/serial/by-id/usb-Silicon_Labs_CP2102N_USB_to_UART_Bridge_Controller_36df624f63e4ee118642737d4c11a646-if00-port0",
+    "baudrate": 115200,
+    "feedback_hz": 20.0,
+    "feedback_timeout_s": 0.6,
+    "m5_open_rad": 0.7977,
+    "m5_closed_rad": 3.1447
+  },
+  "inverse3": {
+    "uri": "ws://127.0.0.1:10001",
+    "device_id": "06DA",
+    "grip_device_id": "1792",
+    "basis": "XYZ",
+    "feedback_hz": 20.0,
+    "feedback_timeout_s": 0.6
+  },
+  "gello": {
+    "port": "/dev/serial/by-id/usb-FTDI_USB__-__Serial_Converter_FTB6W7LM-if00-port0",
+    "baudrate": 57600,
+    "software_root": "../../vendor/gello",
+    "control_mode": "joint",
+    "joint_scale": 1.1,
+    "kinematics_urdf": "../../vendor/gello/gello/factr/urdf/yam_active_gello/robot.urdf",
+    "xyz_axis_map": [
+      [
+        1.0,
+        0.0,
+        0.0
+      ],
+      [
+        0.0,
+        1.0,
+        0.0
+      ],
+      [
+        0.0,
+        0.0,
+        1.0
+      ]
+    ],
+    "j6_sign": 1,
+    "xyz_scale": [
+      2.0,
+      2.0,
+      2.0
+    ],
+    "joint_ids": [
+      1,
+      2,
+      3,
+      4,
+      5,
+      6
+    ],
+    "joint_offsets": [
+      4.574337507945,
+      3.060291671832,
+      1.402049963022,
+      1.363700443325,
+      1.471087575582,
+      2.994338975058
+    ],
+    "joint_signs": [
+      1,
+      1,
+      -1,
+      1,
+      1,
+      1
+    ],
+    "locked_joints": [],
+    "gripper_config": [
+      7,
+      200.478515625,
+      147.3046875
+    ],
+    "feedback_hz": 100.0,
+    "feedback_timeout_s": 0.5,
+    "startup_settle_s": 0.5
+  },
+  "o6": {
+    "open": [
+      157,
+      95,
+      175,
+      0,
+      0,
+      0
+    ],
+    "closed": [
+      78,
+      85,
+      123,
+      0,
+      0,
+      0
+    ],
+    "speed": [
+      120,
+      120,
+      120,
+      120,
+      120,
+      120
+    ],
+    "torque": [
+      30,
+      30,
+      30,
+      30,
+      30,
+      30
+    ],
+    "command_deadband": 2,
+    "feedback_timeout_s": 1.0,
+    "action_timeout_s": 15.0,
+    "open_action": "张开手",
+    "closed_action": "抓取",
+    "actions": {
+      "张开手": [
+        157,
+        95,
+        175,
+        0,
+        0,
+        0
+      ],
+      "中指": [
+        91,
+        132,
+        0,
+        250,
+        0,
+        0
+      ],
+      "轻微抓取": [
+        107,
+        90,
+        129,
+        250,
+        250,
+        250
+      ],
+      "小拇指": [
+        30,
+        250,
+        40,
+        40,
+        40,
+        250
+      ],
+      "抓取": [
+        78,
+        85,
+        123,
+        0,
+        0,
+        0
+      ]
+    },
+    "sdk_root": "../../vendor/actuator/linkerhand-python-sdk/LinkerHand"
+  },
+  "teleop": {
+    "scale_xyz": [
+      1.5,
+      1.5,
+      1.5
+    ],
+    "scale_rpy": [
+      1.0,
+      1.0,
+      1.0
+    ],
+    "max_delta_xyz_mm": [
+      290.0,
+      275.0,
+      300.0
+    ],
+    "max_delta_rpy_rad": [
+      0.35,
+      0.35,
+      0.35
+    ],
+    "max_tcp_speed_mm_s": 150.0,
+    "max_tcp_angular_speed_rad_s": 0.1,
+    "max_master_jump_mm": 35.0,
+    "max_master_angular_jump_rad": 0.35,
+    "period_s": 0.05
+  },
+  "preset": {
+    "robot_velocity_percent": 81.0,
+    "robot_acc_percent": 92.0,
+    "robot_dec_percent": 20.0,
+    "roarm_duration_s": 3.0,
+    "timeout_s": 90.0
+  },
+  "replay": {
+    "servoj_period_s": 0.01,
+    "mode_switch_settle_s": 0.2,
+    "sample_period_s": 0.05,
+    "max_duration_s": 300.0,
+    "max_joint_speed_deg_s": 120.0
+  },
+  "dataset": {
+    "recording_mode": "joint",
+    "root": "../../dataset/train",
+    "repo_prefix": "ace/cr5_o6",
+    "task": "Pick up the motor and place it on the right side with the protruding side facing left.",
+    "fps": 20,
+    "camera_max_age_s": 0.5,
+    "camera_max_skew_s": 0.1,
+    "action_max_age_s": 0.35,
+    "max_tracking_error_deg": 5.0,
+    "worker_python": "../../module/gello_writers/v21/.venv/bin/python",
+    "format": "lerobot_v21",
+    "staging_root": "../../dataset/staging",
+    "worker_pythons": {
+      "lerobot_v21": "../../module/gello_writers/v21/.venv/bin/python",
+      "lerobot_v3": "../../module/gello_writers/v3/.venv/bin/python",
+      "hdf5": "../../module/nrc/.venv/bin/python"
+    }
+  },
+  "shortcuts": {
+    "prepare": "F5",
+    "power_on": "Ctrl+F6",
+    "start_follow": "F6",
+    "stop_follow": "F7",
+    "episode_start": "F8",
+    "episode_save_next": "F9",
+    "episode_discard_retry": "F10",
+    "home": "F11",
+    "emergency_stop": "F12",
+    "o6_open": "1",
+    "o6_grasp": "2",
+    "o6_light_grasp": "3"
+  },
+  "presets": {
+    "HOME": {
+      "saved_at": "2026-08-26 14:27:11",
+      "roarm_joints_rad": [
+        0.2561679931068843,
+        -0.28071848418292644,
+        0.38503765486477204,
+        -0.38350367407674524,
+        -0.02300971181795486,
+        -0.07669056228905369,
+        0.0
+      ],
+      "robot_joints_deg": [
+        -0.010843560247,
+        -0.062790672378,
+        -0.015733506944,
+        -0.080829196506,
+        -0.016979641385,
+        -0.000372992622,
+        0.0
+      ],
+      "robot_tcp": [
+        345.985522664449,
+        -116.596598682202,
+        303.162406466665,
+        3.141296828168,
+        -0.002781296997,
+        1.570978249174,
+        0.0
+      ],
+      "o6_position": [
+        250,
+        252,
+        250,
+        250,
+        250,
+        250
+      ],
+      "gello_joints_rad": [
+        0.2561679931068843,
+        -0.28071848418292644,
+        0.38503765486477204,
+        -0.38350367407674524,
+        -0.02300971181795486,
+        -0.07669056228905369,
+        0.0
+      ]
+    },
+    "A": {
+      "saved_at": "2026-08-13 23:54:08",
+      "roarm_joints_rad": [
+        -0.079767001,
+        -0.612058334,
+        2.296369239,
+        3.138524692
+      ],
+      "robot_joints_deg": [
+        3.774082448223,
+        10.316162109375,
+        -44.789376589331,
+        76.423746996587,
+        -3.291737773631,
+        199.385233208685,
+        0.0
+      ],
+      "robot_tcp": [
+        383.054127592554,
+        -122.080240740045,
+        364.610464363792,
+        3.123592226638,
+        0.733828781607,
+        -1.269381996237,
+        0.0
+      ],
+      "o6_position": [
+        91,
+        99,
+        98,
+        50,
+        50,
+        50
+      ]
+    },
+    "B": {
+      "saved_at": "2026-08-10 02:03:14",
+      "roarm_joints_rad": [
+        -0.007669904,
+        0.11658254,
+        1.586136135,
+        2.176718738
+      ],
+      "robot_joints_deg": [
+        2.958463158938,
+        -16.535348420096,
+        -22.415488214776,
+        97.593136777972,
+        -4.585044785301,
+        -5.754742008625,
+        0.0
+      ],
+      "robot_tcp": [
+        555.880078803175,
+        -120.864582556514,
+        376.50332208089,
+        3.072493319491,
+        1.023997903166,
+        1.502528227863,
+        0.0
+      ],
+      "o6_position": [
+        250,
+        249,
+        249,
+        249,
+        249,
+        249
+      ]
+    },
+    "C": {
+      "saved_at": "2026-08-10 02:09:38",
+      "roarm_joints_rad": [
+        -0.007669904,
+        0.128854386,
+        1.586136135,
+        2.162912911
+      ],
+      "robot_joints_deg": [
+        2.174368376779,
+        -7.754382898312,
+        -7.638258225847,
+        30.578887486222,
+        -1.749905878955,
+        -173.39658453913,
+        0.0
+      ],
+      "robot_tcp": [
+        546.331403322436,
+        -123.567191376853,
+        404.436866917024,
+        3.120260309791,
+        0.265928336983,
+        -1.486569410084,
+        0.0
+      ],
+      "o6_position": [
+        249,
+        248,
+        247,
+        247,
+        247,
+        247
+      ]
+    },
+    "D": {
+      "saved_at": "2026-08-13 23:03:42",
+      "roarm_joints_rad": [
+        0.153398079,
+        -0.326737908,
+        2.054000275,
+        2.159844949
+      ],
+      "robot_joints_deg": [
+        14.151274426149,
+        17.954610692392,
+        -28.958730414362,
+        25.522443563631,
+        -4.830462767346,
+        -161.802024463616,
+        0.0
+      ],
+      "robot_tcp": [
+        383.122285107541,
+        -57.932915477095,
+        412.855540774633,
+        3.120260931579,
+        0.265929281208,
+        -1.486569803103,
+        0.0
+      ],
+      "o6_position": [
+        249,
+        248,
+        246,
+        246,
+        246,
+        246
+      ]
+    }
+  },
+  "trajectory": {
+    "root": "../../dataset/replay/trajectories"
+  },
+  "hardware": {
+    "profile": "cr3a_o6",
+    "name": "CR3A + O6"
+  },
+  "logging": {
+    "level": "INFO"
+  },
+  "ui": {
+    "refresh_ms": 100
+  },
+  "workbench": {
+    "hardware_config": "../hardware/cr3_o6.toml"
+  }
+}

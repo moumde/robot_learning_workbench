@@ -27,21 +27,25 @@ assumed and the O6 is not initialized or commanded by this script.
 from __future__ import annotations
 
 import argparse
-from dataclasses import dataclass
-import json
 import logging
 import math
-from pathlib import Path
 import sys
 import time
+from dataclasses import dataclass
+from pathlib import Path
 from typing import Any
 
 import numpy as np
 
-
 REPO_ROOT = Path(__file__).resolve().parents[3]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
+
+from core.trajectory_bridge import (  # noqa: E402
+    episode_paths,
+    joint_action_arrays,
+    load_shared_trajectory,
+)
 
 LOGGER = logging.getLogger("cr3_o6_ptp_replay")
 
@@ -69,15 +73,7 @@ class PtpTrajectory:
 
 
 def _episode_paths(dataset_dir: Path) -> list[tuple[int, Path]]:
-    paths = (dataset_dir / "data").glob("chunk-*/episode_*.parquet")
-    episodes: list[tuple[int, Path]] = []
-    for path in paths:
-        try:
-            episode_index = int(path.stem.removeprefix("episode_"))
-        except ValueError:
-            continue
-        episodes.append((episode_index, path))
-    return sorted(episodes, key=lambda item: (item[0], str(item[1])))
+    return episode_paths(dataset_dir)
 
 
 def _episode_path(dataset_dir: Path, episode_index: int) -> Path:
@@ -95,107 +91,32 @@ def _episode_path(dataset_dir: Path, episode_index: int) -> Path:
     )
 
 
-def _load_fps(dataset_dir: Path) -> float:
-    try:
-        info = json.loads((dataset_dir / "meta" / "info.json").read_text())
-        fps = float(info.get("fps", CONTROL_HZ))
-    except (OSError, ValueError, TypeError):
-        fps = CONTROL_HZ
-    return fps if math.isfinite(fps) and fps > 0 else CONTROL_HZ
-
-
-def _stack_vector_column(values: Any, *, name: str, width: int) -> np.ndarray:
-    try:
-        result = np.stack([np.asarray(value, dtype=np.float64).reshape(-1) for value in values])
-    except (TypeError, ValueError) as exc:
-        raise ValueError(f"Could not parse the {name} column") from exc
-    if result.ndim != 2 or result.shape[1] != width:
-        raise ValueError(f"{name} must have shape [N, {width}], got {result.shape}")
-    if not np.all(np.isfinite(result)):
-        raise ValueError(f"{name} contains NaN or Inf")
-    return result
-
-
 def load_ptp_trajectory(
     dataset_dir: Path,
     episode_index: int,
     *,
     control_space: str,
 ) -> PtpTrajectory:
-    """Load and validate one LeRobot v2.1 episode without hardware imports."""
-
-    try:
-        import pandas as pd
-    except ImportError as exc:
-        raise RuntimeError("Parquet replay requires pandas and pyarrow; use the NRC environment") from exc
-
+    """Read joint/PTP V2.1/V3 recordings through the common rad/m model."""
+    if control_space not in ("joint", "tcp"):
+        raise ValueError("control_space must be joint or tcp")
     dataset_dir = Path(dataset_dir).expanduser().resolve()
-    source = _episode_path(dataset_dir, episode_index)
-    try:
-        table = pd.read_parquet(source)
-    except Exception as exc:
-        raise RuntimeError(f"Could not read trajectory parquet {source}: {exc}") from exc
-
-    required = {"action", "timestamp", "frame_index"}
-    missing = required - set(table.columns)
-    if missing:
-        raise ValueError(f"Trajectory is missing columns: {sorted(missing)}")
-    table = table.sort_values("frame_index").reset_index(drop=True)
-    if table.empty:
-        raise ValueError("Trajectory is empty")
-    if "episode_index" in table.columns:
-        episode_indices = np.asarray(table["episode_index"], dtype=np.int64)
-        if np.any(episode_indices != episode_index):
-            raise ValueError(f"{source} contains an unexpected episode_index")
-
-    actions = _stack_vector_column(table["action"], name="action", width=ACTION_DIM)
-    timestamps = np.asarray(table["timestamp"], dtype=np.float64)
-    if timestamps.shape != (len(actions),) or not np.all(np.isfinite(timestamps)):
-        raise ValueError("timestamp must be a finite one-dimensional column")
-    if np.any(np.diff(timestamps) < 0):
-        raise ValueError("timestamps must be monotonically increasing")
-
-    target_tcp_poses: np.ndarray | None = None
+    value = load_shared_trajectory(dataset_dir, episode_index)
+    actions, timestamps = joint_action_arrays(value, require_hand=False)
+    poses = None
     if control_space == "tcp":
-        if "target.tcp_pose" not in table.columns:
-            raise ValueError("TCP replay requires the target.tcp_pose column")
-        target_tcp_poses = _stack_vector_column(
-            table["target.tcp_pose"], name="target.tcp_pose", width=TCP_DIM
-        )
-
-    hand_variation = float(np.max(np.ptp(actions[:, ARM_DIM:], axis=0)))
-    max_recorded_speed = (
-        float(np.max(np.abs(np.diff(actions[:, :ARM_DIM], axis=0))) * _load_fps(dataset_dir))
-        if len(actions) > 1
-        else 0.0
-    )
+        if any(frame.robot_tcp_command is None for frame in value.frames):
+            raise ValueError("TCP replay requires target.tcp_pose in every frame")
+        poses = np.asarray([frame.robot_tcp_command for frame in value.frames], dtype=np.float64)
+        poses[:, :3] *= 1000.0  # Existing parent NRC IK interface accepts mm/rad.
+    source = _episode_path(dataset_dir, episode_index)
     LOGGER.info(
-        "Loaded episode %d: %d frames, %.3f s at %.2f fps, source=%s",
+        "Loaded PTP episode %d: %d frames, %.3f s; O6 will not be commanded",
         episode_index,
         len(actions),
-        float(timestamps[-1] - timestamps[0]),
-        _load_fps(dataset_dir),
-        source,
+        value.metadata.duration_s,
     )
-    LOGGER.info("Recorded max CR3 action change: %.3f rad/s", max_recorded_speed)
-    LOGGER.info("Recorded O6 action range: %.3f; O6 will not be commanded", hand_variation)
-    LOGGER.info("First CR3 target: %s", np.round(actions[0, :ARM_DIM], 5).tolist())
-    LOGGER.info("Last CR3 target:  %s", np.round(actions[-1, :ARM_DIM], 5).tolist())
-    if target_tcp_poses is not None:
-        LOGGER.info(
-            "TCP target bounds: min=%s max=%s",
-            np.round(np.min(target_tcp_poses[:, :3], axis=0), 3).tolist(),
-            np.round(np.max(target_tcp_poses[:, :3], axis=0), 3).tolist(),
-        )
-
-    return PtpTrajectory(
-        actions=actions,
-        timestamps=timestamps,
-        target_tcp_poses=target_tcp_poses,
-        episode_index=episode_index,
-        source=source,
-        fps=_load_fps(dataset_dir),
-    )
+    return PtpTrajectory(actions, timestamps, poses, episode_index, source, value.metadata.fps)
 
 
 def _joint_targets(
@@ -222,7 +143,9 @@ def _joint_targets(
         except Exception as exc:
             raise RuntimeError(f"IK conversion failed at frame {frame_index}: {exc}") from exc
         if joints.shape != (ARM_DIM,) or not np.all(np.isfinite(joints)):
-            raise RuntimeError(f"IK returned an invalid six-joint target at frame {frame_index}: {joints}")
+            raise RuntimeError(
+                f"IK returned an invalid six-joint target at frame {frame_index}: {joints}"
+            )
         converted.append(joints.tolist())
     return np.asarray(converted, dtype=np.float64)
 
@@ -285,7 +208,9 @@ def replay_trajectory(
     previous_command = joint_targets[0].copy()
     limited_count = 0
 
-    for index, (target, timestamp) in enumerate(zip(joint_targets, trajectory.timestamps, strict=True)):
+    for index, (target, timestamp) in enumerate(
+        zip(joint_targets, trajectory.timestamps, strict=True)
+    ):
         deadline = started + (float(timestamp) - first_timestamp) / time_scale
         remaining = deadline - time.monotonic()
         if remaining > 0:
@@ -320,15 +245,25 @@ def _parser() -> argparse.ArgumentParser:
         default="joint",
         help="Replay action CR3 joints, or convert target.tcp_pose to joints online",
     )
-    parser.add_argument("--preview-only", action="store_true", help="Validate and summarize without hardware")
-    parser.add_argument("--confirm-motion", action="store_true", help="Required before real robot movement")
+    parser.add_argument(
+        "--preview-only", action="store_true", help="Validate and summarize without hardware"
+    )
+    parser.add_argument(
+        "--confirm-motion", action="store_true", help="Required before real robot movement"
+    )
     parser.add_argument("--no-auto-power-on", action="store_true")
     parser.add_argument("--power-off-on-exit", action="store_true")
-    parser.add_argument("--time-scale", type=float, default=1.0, help="1.0 uses recorded timestamps")
-    parser.add_argument("--max-joint-speed-rad-s", type=float, default=DEFAULT_MAX_JOINT_SPEED_RAD_S)
+    parser.add_argument(
+        "--time-scale", type=float, default=1.0, help="1.0 uses recorded timestamps"
+    )
+    parser.add_argument(
+        "--max-joint-speed-rad-s", type=float, default=DEFAULT_MAX_JOINT_SPEED_RAD_S
+    )
     parser.add_argument("--disable-slew-limit", action="store_true")
     parser.add_argument("--max-ik-step-rad", type=float, default=0.5)
-    parser.add_argument("--initial-move-duration-s", type=float, default=DEFAULT_INITIAL_MOVE_DURATION_S)
+    parser.add_argument(
+        "--initial-move-duration-s", type=float, default=DEFAULT_INITIAL_MOVE_DURATION_S
+    )
     parser.add_argument("--return-to-first-action", action="store_true")
     parser.add_argument("--verbose", action="store_true")
     return parser

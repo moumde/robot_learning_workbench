@@ -19,11 +19,14 @@ fi
 
 mkdir -p "$NRC_ROOT"
 printf 'Creating/updating NRC environment: %s (Python %s)\n' "$NRC_ENV" "$NRC_PYTHON_VERSION"
-uv venv --python "$NRC_PYTHON_VERSION" "$NRC_ENV"
+if [[ ! -x "$NRC_ENV/bin/python" ]]; then
+  uv venv --python "$NRC_PYTHON_VERSION" "$NRC_ENV"
+fi
 
 # The client does not need the full OpenPI training stack.  Keep this
 # environment independent from module/openpi/.venv while installing the
 # network client, LinkerHand dependencies, and parquet reader for trajectory replay.
+# PyArrow 21 retains NumPy 1 support required by openpi-client.
 uv pip install \
   --python "$NRC_ENV/bin/python" \
   -e "$OPENPI_ROOT/packages/openpi-client" \
@@ -31,8 +34,8 @@ uv pip install \
   pyserial \
   PyYAML \
   pandas \
-  pyarrow \
-  PySide6
+  'pyarrow>=21,<22' \
+  PySide6-Essentials
 
 echo
 echo "NRC environment is ready: $NRC_ENV"

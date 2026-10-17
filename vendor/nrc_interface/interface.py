@@ -164,6 +164,7 @@ class CR3Interface:
         servo_vmax: Sequence[float] | None = None,
         servo_amax: Sequence[float] | None = None,
         servo_jmax: Sequence[float] | None = None,
+        session_guard: Any | None = None,
     ) -> None:
         self.robot_ip = str(robot_ip)
         self.control_port = int(control_port)
@@ -183,7 +184,13 @@ class CR3Interface:
 
         self._fds: dict[int, int] = {}
         self._servo_active = False
+        self._connection_complete = False
         self._lock = threading.RLock()
+        if session_guard is None:
+            from core.hardware_session import RobotSessionLock
+            session_guard = RobotSessionLock(self.robot_ip, self.teach_port, self.track_port)
+        self._session_guard = session_guard
+        self._session_guard_held = False
 
     @staticmethod
     def _constraint_vector(values: Sequence[float] | None, name: str) -> list[float]:
@@ -198,7 +205,8 @@ class CR3Interface:
     def connected(self) -> bool:
         """Whether the teach and tracking sockets are both connected."""
 
-        return self.teach_port in self._fds and self.track_port in self._fds
+        return (self._connection_complete and self.teach_port in self._fds
+                and self.track_port in self._fds)
 
     @property
     def servo_active(self) -> bool:
@@ -224,6 +232,9 @@ class CR3Interface:
         fd = int(_nrc.connect_robot(self.robot_ip, str(port)))
         if fd <= 0:
             raise NRCConnectionError(f"connect_robot({self.robot_ip}, {port}) returned {fd}")
+        # Keep ownership immediately: a failed readiness poll may itself fail
+        # to disconnect, in which case the endpoint must remain reserved.
+        self._fds[port] = fd
 
         deadline = time.monotonic() + self.connection_timeout
         try:
@@ -235,14 +246,17 @@ class CR3Interface:
                 raise NRCConnectionError(
                     f"connection to {self.robot_ip}:{port} timed out with status {status}"
                 )
-        except BaseException:
-            _nrc.disconnect_robot(fd)
+        except BaseException as exc:
+            try:
+                self._disconnect_port(port, fd)
+            except Exception as cleanup_error:
+                exc.add_note(f"NRC readiness rollback incomplete: {cleanup_error}")
             raise
 
         LOGGER.info("Connected to CR3 at %s:%d (fd=%d)", self.robot_ip, port, fd)
         return fd
 
-    def connect(self) -> "CR3Interface":
+    def connect(self) -> CR3Interface:
         """Connect the sockets required for state reading and ServoJ control."""
 
         with self._lock:
@@ -253,17 +267,20 @@ class CR3Interface:
                     return self
                 raise NRCConnectionError("partial NRC connection already exists; call disconnect() first")
 
+            self._session_guard.acquire()
+            self._session_guard_held = True
             ports = [self.teach_port, self.track_port]
             if self.connect_control:
                 ports.insert(0, self.control_port)
-            connected: list[int] = []
             try:
                 for port in ports:
                     self._fds[port] = self._connect_port(port)
-                    connected.append(port)
-            except BaseException:
-                for port in reversed(connected):
-                    _nrc.disconnect_robot(self._fds.pop(port))
+                self._connection_complete = True
+            except BaseException as exc:
+                try:
+                    self.disconnect()
+                except Exception as cleanup_error:
+                    exc.add_note(f"NRC connection rollback incomplete: {cleanup_error}")
                 raise
         return self
 
@@ -282,15 +299,28 @@ class CR3Interface:
                 except NRCError:
                     LOGGER.exception("Failed to close ServoJ during disconnect")
                 self._servo_active = False
+            errors = []
             for port, fd in list(self._fds.items()):
                 try:
-                    _nrc.disconnect_robot(fd)
-                finally:
-                    self._fds.pop(port, None)
+                    self._disconnect_port(port, fd)
+                except Exception as exc:
+                    errors.append(exc)
+            if not self._fds and self._session_guard_held:
+                self._connection_complete = False
+                self._session_guard.release()
+                self._session_guard_held = False
+            if errors:
+                raise ExceptionGroup("NRC disconnect incomplete", errors)
+
+    def _disconnect_port(self, port: int, fd: int) -> None:
+        result = _nrc.disconnect_robot(fd)
+        if result is not None and _return_code(result) != 0:
+            raise NRCCommandError("disconnect_robot", result)
+        self._fds.pop(port, None)
 
     close = disconnect
 
-    def __enter__(self) -> "CR3Interface":
+    def __enter__(self) -> CR3Interface:
         return self.connect()
 
     def __exit__(self, exc_type, exc_value, traceback) -> None:
