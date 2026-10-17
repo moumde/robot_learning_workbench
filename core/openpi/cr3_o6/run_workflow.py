@@ -6,10 +6,9 @@ import argparse
 import json
 import logging
 import math
-from pathlib import Path
 import sys
+from pathlib import Path
 from typing import Any
-
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 if str(REPO_ROOT) not in sys.path:
@@ -29,6 +28,23 @@ from core.openpi.cr3_o6.deploy_policy import (  # noqa: E402
     _patch_pymodbus_slave_argument,
     _read_policy_action_chunk,
 )
+from core.openpi.cr3_o6.replay_ptp_dataset import (  # noqa: E402
+    DEFAULT_INITIAL_MOVE_DURATION_S as PTP_INITIAL_MOVE_DURATION_S,
+)
+from core.openpi.cr3_o6.replay_ptp_dataset import (  # noqa: E402
+    DEFAULT_MAX_JOINT_SPEED_RAD_S as PTP_MAX_JOINT_SPEED_RAD_S,
+)
+from core.openpi.cr3_o6.replay_ptp_dataset import (  # noqa: E402
+    _check_joint_steps,
+    _joint_targets,
+    load_ptp_trajectory,
+)
+from core.openpi.cr3_o6.replay_ptp_dataset import (  # noqa: E402
+    _episode_paths as _ptp_episode_paths,
+)
+from core.openpi.cr3_o6.replay_ptp_dataset import (  # noqa: E402
+    replay_trajectory as replay_ptp_trajectory,
+)
 from core.openpi.cr3_o6.replay_trajectory import (  # noqa: E402
     DEFAULT_FIRST_ACTION_MOVE_DURATION_S,
     DEFAULT_MAX_JOINT_SPEED_RAD_S,
@@ -37,16 +53,14 @@ from core.openpi.cr3_o6.replay_trajectory import (  # noqa: E402
     load_trajectory,
     replay_trajectory,
 )
-from core.openpi.cr3_o6.replay_ptp_dataset import (  # noqa: E402
-    DEFAULT_INITIAL_MOVE_DURATION_S as PTP_INITIAL_MOVE_DURATION_S,
-    DEFAULT_MAX_JOINT_SPEED_RAD_S as PTP_MAX_JOINT_SPEED_RAD_S,
-    _check_joint_steps,
-    _joint_targets,
-    _episode_paths as _ptp_episode_paths,
-    load_ptp_trajectory,
-    replay_trajectory as replay_ptp_trajectory,
+from core.trajectory_bridge import (  # noqa: E402
+    ReplayMode,
+    ReplayOptions,
+    episode_paths,
+    load_shared_trajectory,
+    play_in_existing_session,
+    validate_session_trajectory,
 )
-
 
 LOGGER = logging.getLogger("cr3_o6_workflow")
 
@@ -71,7 +85,7 @@ def _validate_plan(plan: Any) -> list[dict[str, Any]]:
                 or duration <= 0
             ):
                 raise ValueError(f"Policy task {index} requires duration_s > 0")
-        elif kind == "replay":
+        elif kind in ("replay", "trajectory"):
             data_dir = task.get("data_dir")
             repeat = task.get("repeat", 1)
             time_scale = task.get("time_scale", 1.0)
@@ -86,6 +100,13 @@ def _validate_plan(plan: Any) -> list[dict[str, Any]]:
                 or time_scale <= 0
             ):
                 raise ValueError(f"Replay task {index} requires time_scale > 0")
+            if kind == "trajectory":
+                if type(task.get("hand_enabled", False)) is not bool:
+                    raise ValueError(f"Shared trajectory task {index} hand_enabled must be boolean")
+                # Use the same bounded options as the GELLO Player.
+                from gello_cr.trajectory.validation import validate_options
+
+                validate_options(_shared_options(task))
         elif kind == "ptp":
             data_dir = task.get("data_dir")
             control_space = task.get("control_space", "joint")
@@ -107,6 +128,35 @@ def _validate_plan(plan: Any) -> list[dict[str, Any]]:
         else:
             raise ValueError(f"Task {index} has unsupported type {kind!r}")
     return tasks
+
+
+def _shared_options(task):
+    return ReplayOptions(
+        mode=ReplayMode(task.get("mode", "absolute")),
+        time_scale=float(task.get("time_scale", 1.0)),
+        hand_enabled=task.get("hand_enabled", False),
+        transition_s=float(task.get("transition_s", 3.0)),
+    )
+
+
+def _load_shared_task(task):
+    path = Path(task["data_dir"]).expanduser()
+    path = path if path.is_absolute() else REPO_ROOT / path
+    episodes = episode_paths(path)
+    if not episodes:
+        raise ValueError(f"No trajectories found under {path}")
+    values = [load_shared_trajectory(path, index) for index, _ in episodes]
+    options = _shared_options(task)
+    for value in values:
+        validate_session_trajectory(value, options)
+    return values, options, int(task.get("repeat", 1))
+
+
+def _run_shared_task(values, options, repeat, robot, hand):
+    for _ in range(repeat):
+        for value in values:
+            LOGGER.info("Shared trajectory: %s; hand=%s", value.name, options.hand_enabled)
+            play_in_existing_session(value, robot, hand, options=options)
 
 
 def _load_replay_task(task: dict[str, Any], hardware: Any):
@@ -310,18 +360,26 @@ def run_workflow(
     policy_port: int,
 ) -> int:
     hardware = load_hardware_config(config_path)
-    needs_hand = any(task["type"] in ("policy", "replay") for task in tasks)
+    needs_hand = any(
+        task["type"] in ("policy", "replay")
+        or (task["type"] == "trajectory" and task.get("hand_enabled", False))
+        for task in tasks
+    )
+    uses_initial_pose = any(task["type"] in ("policy", "replay") for task in tasks)
     if needs_hand and (hardware.hand.model.upper() != "O6" or hardware.hand.joint_count != 6):
         raise ValueError("CR3/O6 workflow requires a six-joint O6 hand")
 
     policy_tasks = [task for task in tasks if task["type"] == "policy"]
     replay_cache: dict[int, tuple[list[Any], int, float]] = {}
     ptp_cache: dict[int, tuple[Any, str, int, float]] = {}
+    shared_cache = {}
     for index, task in enumerate(tasks):
         if task["type"] == "replay":
             replay_cache[index] = _load_replay_task(task, hardware)
         elif task["type"] == "ptp":
             ptp_cache[index] = _load_ptp_task(task)
+        elif task["type"] == "trajectory":
+            shared_cache[index] = _load_shared_task(task)
 
     policy = None
     cameras = None
@@ -353,11 +411,15 @@ def run_workflow(
         if needs_hand:
             LinkerHandApi = _load_hand_api()
             hand_kwargs = hardware.hand.api_kwargs()
-            endpoint = hand_kwargs["modbus"] if hand_kwargs["modbus"] != "None" else hand_kwargs["can"]
+            endpoint = (
+                hand_kwargs["modbus"] if hand_kwargs["modbus"] != "None" else hand_kwargs["can"]
+            )
             LOGGER.info("Connecting %s LinkerHand O6 via %s", hardware.hand.side, endpoint)
             hand_api = LinkerHandApi(**hand_kwargs)
             if hand_api.hand_type != hardware.hand.side or str(hand_api.hand_joint).upper() != "O6":
-                raise RuntimeError(f"Unexpected LinkerHand: {hand_api.hand_type}/{hand_api.hand_joint}")
+                raise RuntimeError(
+                    f"Unexpected LinkerHand: {hand_api.hand_type}/{hand_api.hand_joint}"
+                )
             hand_api.set_speed([100] * hardware.hand.joint_count)
 
         if cameras is not None:
@@ -405,7 +467,7 @@ def run_workflow(
 
         robot.open_servoj()
         servo_opened = True
-        if needs_hand:
+        if uses_initial_pose:
             _move_to_initial_position(
                 robot,
                 hand_api,
@@ -437,7 +499,7 @@ def run_workflow(
                     time_scale=time_scale,
                     max_joint_speed_rad_s=DEFAULT_MAX_JOINT_SPEED_RAD_S,
                 )
-            else:
+            elif task["type"] == "ptp":
                 trajectory, control_space, repeat, time_scale = ptp_cache[index - 1]
                 _run_ptp_task(
                     trajectory,
@@ -446,6 +508,9 @@ def run_workflow(
                     repeat=repeat,
                     time_scale=time_scale,
                 )
+            else:
+                values, options, repeat = shared_cache[index - 1]
+                _run_shared_task(values, options, repeat, robot, hand_api)
             state = robot.get_servo_state()
             if state != SERVO_RUNNING:
                 raise RuntimeError(
@@ -461,7 +526,7 @@ def run_workflow(
     finally:
         if servo_opened:
             try:
-                if needs_hand:
+                if uses_initial_pose:
                     if log_servo_state("before final home move") == SERVO_RUNNING:
                         _move_to_initial_position(
                             robot,

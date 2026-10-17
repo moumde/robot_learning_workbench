@@ -23,6 +23,8 @@ config/hardware/*.local.toml
 # Local data and model artifacts (do not commit large files)
 dataset/train/*
 !dataset/train/.gitkeep
+dataset/staging/*
+!dataset/staging/.gitkeep
 dataset/replay/*
 !dataset/replay/.gitkeep
 checkpoints/*

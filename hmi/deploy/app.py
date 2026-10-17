@@ -3,23 +3,24 @@
 from __future__ import annotations
 
 import ast
-from dataclasses import dataclass
 import html
 import json
 import math
 import os
-from pathlib import Path
 import signal
 import sys
+from dataclasses import dataclass
+from pathlib import Path
 from typing import Any
 
-from PySide6.QtCore import QProcess, QProcessEnvironment, QTimer, Qt
+from PySide6.QtCore import QProcess, QProcessEnvironment, Qt, QTimer
 from PySide6.QtNetwork import QTcpSocket
 from PySide6.QtWidgets import (
     QCheckBox,
     QComboBox,
     QDialog,
     QDialogButtonBox,
+    QDoubleSpinBox,
     QFileDialog,
     QFormLayout,
     QGroupBox,
@@ -32,14 +33,17 @@ from PySide6.QtWidgets import (
     QMessageBox,
     QPushButton,
     QSpinBox,
-    QDoubleSpinBox,
     QTextEdit,
     QVBoxLayout,
     QWidget,
 )
 
-
 ROOT = Path(__file__).resolve().parents[2]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
+from core.trajectory_bridge import episode_paths  # noqa: E402
+
 HARDWARE_DIR = ROOT / "config" / "hardware"
 CHECKPOINTS_DIR = ROOT / "checkpoints"
 OPENPI_CONFIG_FILE = ROOT / "module" / "openpi" / "src" / "openpi" / "training" / "config.py"
@@ -50,14 +54,7 @@ WORKFLOW_VERSION = 1
 
 
 def _episode_files(dataset_dir: Path) -> list[tuple[int, Path]]:
-    episodes = []
-    for path in (dataset_dir / "data").glob("chunk-*/episode_*.parquet"):
-        try:
-            episode_index = int(path.stem.removeprefix("episode_"))
-        except ValueError:
-            continue
-        episodes.append((episode_index, path))
-    return sorted(episodes, key=lambda item: (item[0], str(item[1])))
+    return episode_paths(dataset_dir)
 
 
 def _discover_policy_configs(config_file: Path = OPENPI_CONFIG_FILE) -> list[str]:
@@ -82,7 +79,9 @@ def _discover_policy_configs(config_file: Path = OPENPI_CONFIG_FILE) -> list[str
     for item in config_list.elts:
         if not isinstance(item, ast.Call):
             continue
-        data_value = next((keyword.value for keyword in item.keywords if keyword.arg == "data"), None)
+        data_value = next(
+            (keyword.value for keyword in item.keywords if keyword.arg == "data"), None
+        )
         if not (
             isinstance(data_value, ast.Call)
             and isinstance(data_value.func, ast.Name)
@@ -146,6 +145,22 @@ def _serialize_task(task: Task) -> dict[str, Any]:
             "control_space": task.control_space,
             "repeat_count": task.repeat_count,
             "time_scale": task.time_scale,
+        }
+    if task.kind == "trajectory" and task.dataset_dir is not None:
+        dataset_dir = task.dataset_dir.expanduser().resolve()
+        stored_path = (
+            dataset_dir.relative_to(ROOT).as_posix()
+            if dataset_dir.is_relative_to(ROOT)
+            else str(dataset_dir)
+        )
+        return {
+            "type": "trajectory",
+            "description": task.description,
+            "dataset_dir": stored_path,
+            "repeat_count": task.repeat_count,
+            "time_scale": task.time_scale,
+            "hand_enabled": task.hand_enabled,
+            "mode": task.mode,
         }
     raise ValueError(f"无法保存未知或不完整的任务类型：{task.kind}")
 
@@ -251,6 +266,39 @@ def _deserialize_workflow(data: Any) -> list[Task]:
             )
             continue
 
+        if kind == "trajectory":
+            raw_path = raw.get("dataset_dir")
+            if not isinstance(raw_path, str) or not raw_path.strip():
+                raise ValueError(f"任务 {index} 缺少共享轨迹路径")
+            repeat = raw.get("repeat_count", 1)
+            time_scale = raw.get("time_scale", 1.0)
+            hand_enabled = raw.get("hand_enabled", False)
+            mode = raw.get("mode", "absolute")
+            if type(repeat) is not int or not 1 <= repeat <= 10_000:
+                raise ValueError(f"任务 {index} 播放次数必须在 1 到 10000 之间")
+            if (
+                isinstance(time_scale, bool)
+                or not isinstance(time_scale, (int, float))
+                or not 0.1 <= time_scale <= 2.0
+            ):
+                raise ValueError(f"任务 {index} 共享轨迹速度倍率必须在 0.1 到 2 之间")
+            if type(hand_enabled) is not bool or mode not in ("absolute", "relative"):
+                raise ValueError(f"任务 {index} 共享轨迹通道或模式无效")
+            path = Path(raw_path).expanduser()
+            path = (path if path.is_absolute() else ROOT / path).resolve()
+            tasks.append(
+                Task(
+                    "trajectory",
+                    description,
+                    dataset_dir=path,
+                    repeat_count=repeat,
+                    time_scale=float(time_scale),
+                    hand_enabled=hand_enabled,
+                    mode=mode,
+                )
+            )
+            continue
+
         raise ValueError(f"任务 {index} 类型不支持：{kind!r}")
     return tasks
 
@@ -265,6 +313,8 @@ class Task:
     repeat_count: int = 1
     time_scale: float = 1.0
     control_space: str = "joint"
+    hand_enabled: bool = False
+    mode: str = "absolute"
 
 
 class TaskDialog(QDialog):
@@ -277,9 +327,12 @@ class TaskDialog(QDialog):
         self.kind.addItem("PI05 模型推理", "policy")
         self.kind.addItem("重播数据集轨迹", "replay")
         self.kind.addItem("重播走点轨迹（CR3）", "ptp")
+        self.kind.addItem("共享轨迹（GELLO / LeRobot）", "trajectory")
         form.addRow("任务类型", self.kind)
 
-        self.prompt = QLineEdit("Pick up the motor and place it on the right side with the protruding side facing left.")
+        self.prompt = QLineEdit(
+            "Pick up the motor and place it on the right side with the protruding side facing left."
+        )
         self.prompt_label = QLabel("推理指令")
         form.addRow(self.prompt_label, self.prompt)
         self.duration = QDoubleSpinBox()
@@ -307,6 +360,13 @@ class TaskDialog(QDialog):
         self.control_space.addItem("关节空间（action）", "joint")
         self.control_space_label = QLabel("走点控制空间")
         form.addRow(self.control_space_label, self.control_space)
+        self.hand_enabled = QCheckBox("同时回放 O6 手部（需要轨迹包含手部数据）")
+        form.addRow(self.hand_enabled)
+        self.replay_mode = QComboBox()
+        self.replay_mode.addItem("绝对关节目标", "absolute")
+        self.replay_mode.addItem("相对当前位置", "relative")
+        self.replay_mode_label = QLabel("共享轨迹模式")
+        form.addRow(self.replay_mode_label, self.replay_mode)
 
         self.repeat_count = QSpinBox()
         self.repeat_count.setRange(1, 10_000)
@@ -321,7 +381,9 @@ class TaskDialog(QDialog):
         form.addRow(self.time_scale_label, self.time_scale)
 
         self.kind.currentIndexChanged.connect(self._update_fields)
-        buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
+        buttons = QDialogButtonBox(
+            QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel
+        )
         buttons.accepted.connect(self.accept)
         buttons.rejected.connect(self.reject)
         form.addRow(buttons)
@@ -329,14 +391,16 @@ class TaskDialog(QDialog):
         self._update_fields()
 
     def _browse_dataset(self) -> None:
-        directory = QFileDialog.getExistingDirectory(self, "选择 LeRobot 数据集", self.dataset.text())
+        directory = QFileDialog.getExistingDirectory(
+            self, "选择 LeRobot 数据集或 UUID 轨迹目录", self.dataset.text()
+        )
         if directory:
             self.dataset.setText(directory)
 
     def _update_fields(self) -> None:
         kind = self.kind.currentData()
         is_policy = kind == "policy"
-        is_replay = kind in ("replay", "ptp")
+        is_replay = kind in ("replay", "ptp", "trajectory")
         is_ptp = kind == "ptp"
         if kind != self._last_kind:
             current_path = Path(self.dataset.text()).expanduser()
@@ -361,13 +425,20 @@ class TaskDialog(QDialog):
         self.time_scale_label.setVisible(is_replay)
         self.control_space.setVisible(is_ptp)
         self.control_space_label.setVisible(is_ptp)
+        is_shared = kind == "trajectory"
+        self.hand_enabled.setVisible(is_shared)
+        self.replay_mode.setVisible(is_shared)
+        self.replay_mode_label.setVisible(is_shared)
+        self.time_scale.setMaximum(2.0 if is_shared else 10.0)
 
     def task(self) -> Task:
         if self.kind.currentData() == "policy":
             prompt = self.prompt.text().strip()
             if not prompt:
                 raise ValueError("推理指令不能为空")
-            return Task("policy", f"PI05 推理 · {self.duration.value():g}s", self.duration.value(), prompt)
+            return Task(
+                "policy", f"PI05 推理 · {self.duration.value():g}s", self.duration.value(), prompt
+            )
         dataset = Path(self.dataset.text()).expanduser()
         if not dataset.is_absolute():
             dataset = ROOT / dataset
@@ -376,10 +447,19 @@ class TaskDialog(QDialog):
         episodes = _episode_files(dataset)
         if not episodes:
             raise ValueError(
-                f"该目录中没有找到轨迹文件。请选择包含 "
-                f"data/chunk-*/episode_*.parquet 的数据集目录：{dataset}"
+                f"该目录中没有找到轨迹文件。请选择 LeRobot 数据集或包含 meta.json 的 UUID 轨迹目录：{dataset}"
             )
         repeat_count = self.repeat_count.value()
+        if self.kind.currentData() == "trajectory":
+            return Task(
+                "trajectory",
+                f"共享轨迹 · {dataset.name} · {len(episodes)} 条 × {repeat_count} 遍",
+                dataset_dir=dataset,
+                repeat_count=repeat_count,
+                time_scale=self.time_scale.value(),
+                hand_enabled=self.hand_enabled.isChecked(),
+                mode=self.replay_mode.currentData(),
+            )
         if self.kind.currentData() == "ptp":
             control_space = self.control_space.currentData()
             return Task(
@@ -408,6 +488,7 @@ class MainWindow(QMainWindow):
         self.tasks: list[Task] = []
         self.server_process: QProcess | None = None
         self.task_process: QProcess | None = None
+        self.teleop_process: QProcess | None = None
         self.server_ready = False
         self.stop_sequence_requested = False
         self.close_after_stop = False
@@ -476,6 +557,9 @@ class MainWindow(QMainWindow):
         server_layout.addStretch(1)
         selection_layout.addRow("模型服务", server_row)
         root_layout.addWidget(selection)
+        self.teleop_button = QPushButton("遥操与采集")
+        self.teleop_button.clicked.connect(self._start_teleop)
+        root_layout.addWidget(self.teleop_button)
 
         sequence_box = QGroupBox("执行序列（按列表顺序运行）")
         sequence_layout = QVBoxLayout(sequence_box)
@@ -559,8 +643,12 @@ class MainWindow(QMainWindow):
             self.experiment_combo.addItem("未找到有效训练结果", "")
         elif experiments:
             preferred = next(
-                (i for i in range(self.experiment_combo.count())
-                 if self.experiment_combo.itemData(i) == str((config_dir / policy_name).resolve())),
+                (
+                    i
+                    for i in range(self.experiment_combo.count())
+                    if self.experiment_combo.itemData(i)
+                    == str((config_dir / policy_name).resolve())
+                ),
                 -1,
             )
             if preferred < 0:
@@ -669,13 +757,17 @@ class MainWindow(QMainWindow):
             QMessageBox.warning(self, "读取失败", f"工作流配置无效：{exc}")
             return
 
-        if self.tasks and QMessageBox.question(
-            self,
-            "替换当前任务流",
-            f"将用 {source.name} 替换当前的 {len(self.tasks)} 个任务，是否继续？",
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.Cancel,
-            QMessageBox.StandardButton.Cancel,
-        ) != QMessageBox.StandardButton.Yes:
+        if (
+            self.tasks
+            and QMessageBox.question(
+                self,
+                "替换当前任务流",
+                f"将用 {source.name} 替换当前的 {len(self.tasks)} 个任务，是否继续？",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.Cancel,
+                QMessageBox.StandardButton.Cancel,
+            )
+            != QMessageBox.StandardButton.Yes
+        ):
             return
         self.tasks = loaded_tasks
         self._refresh_tasks()
@@ -827,7 +919,10 @@ class MainWindow(QMainWindow):
             pass
 
     def _kill_server_if_needed(self) -> None:
-        if self.server_process is not None and self.server_process.state() != QProcess.ProcessState.NotRunning:
+        if (
+            self.server_process is not None
+            and self.server_process.state() != QProcess.ProcessState.NotRunning
+        ):
             self.server_process.kill()
 
     def _read_process(self, process: QProcess, is_stderr: bool) -> None:
@@ -835,6 +930,48 @@ class MainWindow(QMainWindow):
         text = bytes(data).decode(errors="replace").rstrip()
         if text:
             self._log(html.escape(text).replace("\n", "<br>"))
+
+    def _start_teleop(self) -> None:
+        if self.task_process is not None:
+            QMessageBox.warning(self, "工作流正在运行", "请先停止工作流，再打开遥操与采集。")
+            return
+        if self.teleop_process is not None:
+            return
+        try:
+            profile = self._selected_hardware()
+        except ValueError as exc:
+            QMessageBox.warning(self, "配置无效", str(exc))
+            return
+        process = QProcess(self)
+        process.setProgram("bash")
+        process.setArguments(
+            [str(ROOT / "scripts" / "run_teleop.sh"), "--hardware-config", str(profile)]
+        )
+        process.setWorkingDirectory(str(ROOT))
+        environment = QProcessEnvironment.systemEnvironment()
+        environment.insert("PYTHONUNBUFFERED", "1")
+        process.setProcessEnvironment(environment)
+        process.readyReadStandardOutput.connect(lambda p=process: self._read_process(p, False))
+        process.readyReadStandardError.connect(lambda p=process: self._read_process(p, True))
+        process.finished.connect(self._teleop_finished)
+        process.errorOccurred.connect(self._teleop_error)
+        self.teleop_process = process
+        self.teleop_button.setEnabled(False)
+        self.run_button.setEnabled(False)
+        self._log("打开遥操与采集；连接、使能和采样由采集窗口人工操作。")
+        process.start()
+
+    def _teleop_error(self, error) -> None:
+        self._log(f"遥操进程错误：{error}")
+        if error == QProcess.ProcessError.FailedToStart:
+            self._teleop_finished(-1, QProcess.ExitStatus.CrashExit)
+
+    def _teleop_finished(self, code: int, status: QProcess.ExitStatus) -> None:
+        self._log(f"遥操与采集已退出（code={code}, status={status.name}）")
+        self.teleop_process = None
+        self.teleop_button.setEnabled(self.task_process is None)
+        self.run_button.setEnabled(self.task_process is None)
+        self._close_if_stopped()
 
     def _preview_plan(self) -> None:
         if not self.tasks:
@@ -844,13 +981,11 @@ class MainWindow(QMainWindow):
             profile = self._selected_hardware()
             lines = [f"硬件：{profile.stem}", f"策略：{self.policy_config.currentText()}"]
             for index, task in enumerate(self.tasks, start=1):
-                if task.kind == "replay":
+                if task.kind in ("replay", "trajectory"):
                     data_dir = task.dataset_dir
                     episodes = _episode_files(data_dir)
                     if not episodes:
-                        raise ValueError(
-                            f"数据集中已没有可重播轨迹：{data_dir}"
-                        )
+                        raise ValueError(f"数据集中已没有可重播轨迹：{data_dir}")
                     episode_indices = [episode_index for episode_index, _path in episodes]
                     lines.append(
                         f"{index}. {task.description} · episode 顺序：{episode_indices} "
@@ -860,9 +995,7 @@ class MainWindow(QMainWindow):
                     episodes = _episode_files(task.dataset_dir)
                     available = [episode_index for episode_index, _path in episodes]
                     if not available:
-                        raise ValueError(
-                            f"数据集中已没有可重播走点轨迹：{task.dataset_dir}"
-                        )
+                        raise ValueError(f"数据集中已没有可重播走点轨迹：{task.dataset_dir}")
                     lines.append(
                         f"{index}. {task.description} · 按编号顺序重播全部 Episode {available} "
                         f"（{task.control_space} 空间），重复 {task.repeat_count} 遍"
@@ -876,6 +1009,9 @@ class MainWindow(QMainWindow):
 
     def _run_plan(self) -> None:
         if self.task_process is not None or not self.tasks:
+            return
+        if self.teleop_process is not None:
+            QMessageBox.warning(self, "遥操窗口正在运行", "请先关闭遥操与采集窗口，再执行工作流。")
             return
         if not self.arm_confirm.isChecked():
             QMessageBox.warning(self, "需要确认", "请先勾选真实运动安全确认。")
@@ -894,12 +1030,14 @@ class MainWindow(QMainWindow):
         plan_tasks: list[dict[str, Any]] = []
         for task in self.tasks:
             if task.kind == "policy":
-                plan_tasks.append({
-                    "type": "policy",
-                    "name": task.description,
-                    "prompt": task.prompt,
-                    "duration_s": task.duration_s,
-                })
+                plan_tasks.append(
+                    {
+                        "type": "policy",
+                        "name": task.description,
+                        "prompt": task.prompt,
+                        "duration_s": task.duration_s,
+                    }
+                )
             elif task.kind == "replay":
                 dataset_dir = task.dataset_dir
                 if not _episode_files(dataset_dir):
@@ -909,13 +1047,30 @@ class MainWindow(QMainWindow):
                         f"数据集中没有可重播轨迹：{dataset_dir}",
                     )
                     return
-                plan_tasks.append({
-                    "type": "replay",
-                    "name": task.description,
-                    "data_dir": str(dataset_dir),
-                    "repeat": task.repeat_count,
-                    "time_scale": task.time_scale,
-                })
+                plan_tasks.append(
+                    {
+                        "type": "replay",
+                        "name": task.description,
+                        "data_dir": str(dataset_dir),
+                        "repeat": task.repeat_count,
+                        "time_scale": task.time_scale,
+                    }
+                )
+            elif task.kind == "trajectory":
+                if not _episode_files(task.dataset_dir):
+                    QMessageBox.warning(self, "没有轨迹", f"找不到共享轨迹：{task.dataset_dir}")
+                    return
+                plan_tasks.append(
+                    {
+                        "type": "trajectory",
+                        "name": task.description,
+                        "data_dir": str(task.dataset_dir),
+                        "repeat": task.repeat_count,
+                        "time_scale": task.time_scale,
+                        "mode": task.mode,
+                        "hand_enabled": task.hand_enabled,
+                    }
+                )
             else:
                 dataset_dir = task.dataset_dir
                 episode_indices = [index for index, _path in _episode_files(dataset_dir)]
@@ -926,14 +1081,16 @@ class MainWindow(QMainWindow):
                         f"数据集中没有可重播走点轨迹：{dataset_dir}",
                     )
                     return
-                plan_tasks.append({
-                    "type": "ptp",
-                    "name": task.description,
-                    "data_dir": str(dataset_dir),
-                    "control_space": task.control_space,
-                    "repeat": task.repeat_count,
-                    "time_scale": task.time_scale,
-                })
+                plan_tasks.append(
+                    {
+                        "type": "ptp",
+                        "name": task.description,
+                        "data_dir": str(dataset_dir),
+                        "control_space": task.control_space,
+                        "repeat": task.repeat_count,
+                        "time_scale": task.time_scale,
+                    }
+                )
 
         if any(task.kind in ("policy", "replay") for task in self.tasks):
             note = (
@@ -942,39 +1099,57 @@ class MainWindow(QMainWindow):
                 "且不控制 O6。全部任务结束后统一清理。如果控制器进入错误态，后续任务会停止。"
                 "请确认初始位姿和现场环境安全。"
             )
+        elif any(task.kind == "trajectory" for task in self.tasks):
+            note = (
+                "将按顺序执行共享轨迹与走点任务。共享轨迹保留关节选择和绝对/相对模式，"
+                "从当前位置过渡；只有明确选择手部回放的共享任务会控制 O6。"
+                "离线预览计划需要连接后重新规划，不能直接执行。请确认目标轨迹和现场环境安全。"
+            )
         else:
             note = (
                 "将控制真实 CR3。此任务流仅包含走点轨迹：不连接或控制 O6，也不先移动到统一初始位姿；"
                 "机器人会从当前位置开始，依次平滑过渡到数据集中每条 Episode 的首点并播放。"
                 "请确认目标轨迹及现场环境安全；如果控制器进入错误态，工作流会停止。"
             )
-        if QMessageBox.warning(
-            self,
-            "确认机器人运动",
-            note,
-            QMessageBox.StandardButton.Cancel | QMessageBox.StandardButton.Yes,
-            QMessageBox.StandardButton.Cancel,
-        ) != QMessageBox.StandardButton.Yes:
+        if (
+            QMessageBox.warning(
+                self,
+                "确认机器人运动",
+                note,
+                QMessageBox.StandardButton.Cancel | QMessageBox.StandardButton.Yes,
+                QMessageBox.StandardButton.Cancel,
+            )
+            != QMessageBox.StandardButton.Yes
+        ):
             return
         self.run_button.setEnabled(False)
+        self.teleop_button.setEnabled(False)
         self.stop_task_button.setEnabled(True)
         self._start_workflow(plan_tasks)
 
     def _start_workflow(self, plan_tasks: list[dict[str, Any]]) -> None:
+        if self.teleop_process is not None:
+            raise RuntimeError("请先关闭遥操与采集窗口")
         config = str(self._selected_hardware())
         plan_json = json.dumps({"tasks": plan_tasks}, ensure_ascii=False)
         process = QProcess(self)
         process.setProgram("bash")
-        process.setArguments([
-            str(ROOT / "scripts" / "run_nrc.sh"),
-            "python",
-            str(ROOT / "core" / "openpi" / "cr3_o6" / "run_workflow.py"),
-            "--config", config,
-            "--host", "127.0.0.1",
-            "--port", str(self.port.value()),
-            "--plan-json", plan_json,
-            "--confirm-motion",
-        ])
+        process.setArguments(
+            [
+                str(ROOT / "scripts" / "run_nrc.sh"),
+                "python",
+                str(ROOT / "core" / "openpi" / "cr3_o6" / "run_workflow.py"),
+                "--config",
+                config,
+                "--host",
+                "127.0.0.1",
+                "--port",
+                str(self.port.value()),
+                "--plan-json",
+                plan_json,
+                "--confirm-motion",
+            ]
+        )
         process.setWorkingDirectory(str(ROOT))
         environment = QProcessEnvironment.systemEnvironment()
         environment.insert("PYTHONUNBUFFERED", "1")
@@ -982,10 +1157,16 @@ class MainWindow(QMainWindow):
         process.readyReadStandardOutput.connect(lambda p=process: self._read_process(p, False))
         process.readyReadStandardError.connect(lambda p=process: self._read_process(p, True))
         process.finished.connect(self._workflow_finished)
-        process.errorOccurred.connect(lambda error: self._log(f"工作流进程错误：{error}"))
+        process.errorOccurred.connect(self._workflow_error)
         self.task_process = process
         self._log(f"启动单会话工作流，包含 {len(self.tasks)} 个任务。")
         process.start()
+
+    def _workflow_error(self, error) -> None:
+        self._log(f"工作流进程错误：{error}")
+        if error == QProcess.ProcessError.FailedToStart:
+            self._finish_task_run()
+            self._close_if_stopped()
 
     def _workflow_finished(self, code: int, status: QProcess.ExitStatus) -> None:
         self._log(f"工作流进程退出（code={code}, status={status.name}）")
@@ -1013,7 +1194,10 @@ class MainWindow(QMainWindow):
             QTimer.singleShot(15000, self._kill_task_if_needed)
 
     def _kill_task_if_needed(self) -> None:
-        if self.task_process is not None and self.task_process.state() != QProcess.ProcessState.NotRunning:
+        if (
+            self.task_process is not None
+            and self.task_process.state() != QProcess.ProcessState.NotRunning
+        ):
             self._log("任务尚未响应停止信号；未强制杀进程，以保留脚本清理硬件的机会。")
             QMessageBox.warning(
                 self,
@@ -1023,19 +1207,20 @@ class MainWindow(QMainWindow):
 
     def _finish_task_run(self) -> None:
         self.task_process = None
-        self.run_button.setEnabled(True)
+        self.run_button.setEnabled(self.teleop_process is None)
+        self.teleop_button.setEnabled(self.teleop_process is None)
         self.stop_task_button.setEnabled(False)
 
     def closeEvent(self, event) -> None:  # noqa: N802 - Qt API name
         running = any(
             process is not None and process.state() != QProcess.ProcessState.NotRunning
-            for process in (self.task_process, self.server_process)
+            for process in (self.task_process, self.server_process, self.teleop_process)
         )
         if running:
             answer = QMessageBox.question(
                 self,
                 "退出工作台",
-                "仍有任务或模型服务在运行。退出将发送中断信号，并等待清理完成。是否继续？",
+                "仍有任务、采集窗口或模型服务在运行。将停止任务与模型服务；请在采集窗口处理未保存数据并正常关闭，随后主窗口退出。是否继续？",
                 QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
                 QMessageBox.StandardButton.No,
             )
@@ -1048,12 +1233,19 @@ class MainWindow(QMainWindow):
                 self._send_interrupt(self.task_process)
             if self.server_process is not None:
                 self._send_interrupt(self.server_process)
+            if self.teleop_process is not None:
+                # A process signal bypasses the collection window's pending-data
+                # decisions. Wait for its normal close/save flow instead.
+                self._log("请在遥操与采集窗口中正常关闭并处理未保存数据；完成后主窗口将退出。")
             event.ignore()
             return
         event.accept()
 
     def _close_if_stopped(self) -> None:
-        if self.close_after_stop and self.task_process is None and self.server_process is None:
+        if self.close_after_stop and all(
+            process is None
+            for process in (self.task_process, self.server_process, self.teleop_process)
+        ):
             self.close_after_stop = False
             QTimer.singleShot(0, self.close)
 

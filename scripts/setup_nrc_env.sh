@@ -42,6 +42,7 @@ fi
 
 # Keep this environment independent from module/openpi/.venv. Install the
 # deployment camera backend, HMI, parquet replay, and hand transport packages.
+# PyArrow 21 retains NumPy 1 support required by openpi-client.
 uv pip install \
   --python "$NRC_ENV/bin/python" \
   -e "$OPENPI_ROOT/packages/openpi-client" \
@@ -52,7 +53,7 @@ uv pip install \
   pyserial \
   python-can \
   pandas \
-  pyarrow \
+  'pyarrow>=21,<22' \
   PyYAML \
   "PySide6>=6.7,<7"
 
