@@ -369,6 +369,23 @@ def run_workflow(
             SERVO_STOPPED,
         )
 
+        servo_state_names = {
+            SERVO_STOPPED: "STOPPED",
+            SERVO_READY: "READY",
+            SERVO_ERROR: "ERROR",
+            SERVO_RUNNING: "RUNNING",
+        }
+
+        def log_servo_state(stage: str) -> int:
+            state = robot.get_servo_state()
+            LOGGER.info(
+                "CR3 servo state %s: %s (%d)",
+                stage,
+                servo_state_names.get(state, "UNKNOWN"),
+                state,
+            )
+            return state
+
         state = robot.get_servo_state()
         if state == SERVO_ERROR:
             raise RuntimeError(
@@ -443,41 +460,81 @@ def run_workflow(
         if servo_opened:
             try:
                 if needs_hand:
-                    if robot.get_servo_state() == SERVO_RUNNING:
+                    if log_servo_state("before final home move") == SERVO_RUNNING:
                         _move_to_initial_position(
                             robot,
                             hand_api,
                             DEFAULT_INITIAL_MOVE_DURATION_S,
                             MAX_JOINT_TARGET_SPEED_RAD_S,
                         )
+                        log_servo_state("after final home move")
                     else:
                         LOGGER.error("Skipping final home move because CR3 is not in running state")
                         cleanup_failed = True
             except Exception:
                 LOGGER.exception("Failed to return CR3/O6 to the initial position")
                 cleanup_failed = True
-            try:
-                robot.close_servoj()
-            except Exception:
-                LOGGER.exception("Failed to close CR3 ServoJ")
-                cleanup_failed = True
+        # Match the verified LeRobot/ROS2 lifecycle: keep ServoJ open while
+        # cameras and the hand are being disconnected, then close ServoJ and
+        # immediately request power-off through the teach connection.
         if cameras is not None:
             try:
                 cameras.disconnect()
             except Exception:
                 LOGGER.exception("Failed to disconnect D435 cameras")
                 cleanup_failed = True
+            if servo_opened:
+                try:
+                    log_servo_state("after disconnecting D435 cameras")
+                except Exception:
+                    LOGGER.exception("Failed to read CR3 state after disconnecting D435 cameras")
+                    cleanup_failed = True
         if hand_api is not None:
             _close_hand(hand_api)
+            if servo_opened:
+                try:
+                    log_servo_state("after closing LinkerHand connection")
+                except Exception:
+                    LOGGER.exception("Failed to read CR3 state after closing LinkerHand connection")
+                    cleanup_failed = True
+        if servo_opened:
+            try:
+                log_servo_state("before closing ServoJ")
+                robot.close_servoj()
+                log_servo_state("after closing ServoJ")
+            except Exception:
+                LOGGER.exception("Failed to close CR3 ServoJ")
+                cleanup_failed = True
         if powered_by_workflow:
             try:
-                if robot.get_servo_state() == SERVO_RUNNING:
+                state = log_servo_state("before final power-off")
+                if state == SERVO_RUNNING:
                     robot.power_off()
+                    log_servo_state("after final power-off")
+                elif state in (SERVO_STOPPED, SERVO_READY):
+                    LOGGER.info("CR3 is already %s; no power-off command is needed", servo_state_names[state])
                 else:
-                    LOGGER.error("Skipping power-off because CR3 is not in running state")
+                    LOGGER.error(
+                        "Skipping power-off because CR3 is in %s (%d); "
+                        "this state was present before the power-off command",
+                        servo_state_names.get(state, "UNKNOWN"),
+                        state,
+                    )
                     cleanup_failed = True
             except Exception:
                 LOGGER.exception("Failed to power off CR3 at workflow end")
+                try:
+                    failure_state = robot.get_servo_state()
+                    failure_mode = robot.get_current_mode()
+                    LOGGER.error(
+                        "CR3 diagnostics immediately after power-off failure: "
+                        "servo_state=%s (%d), controller_mode=%d",
+                        servo_state_names.get(failure_state, "UNKNOWN"),
+                        failure_state,
+                        failure_mode,
+                    )
+                except Exception:
+                    LOGGER.exception("Could not read CR3 diagnostics after power-off failure")
                 cleanup_failed = True
         try:
             robot.disconnect()
