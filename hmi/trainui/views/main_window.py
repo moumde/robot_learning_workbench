@@ -701,7 +701,8 @@ class MainWindow(QMainWindow):
         self.num_workers.setValue(config.num_workers)
         self.seed.setValue(config.seed)
         self.fsdp_devices.setValue(config.fsdp_devices)
-        self.wandb.setChecked(config.wandb_enabled)
+        # Keep W&B opt-in in the UI; local training should not require login.
+        self.wandb.setChecked(False)
 
         self._set_optional_line(self.peak_lr, config.peak_lr)
         self._set_optional_spin(self.warmup_steps, config.warmup_steps)

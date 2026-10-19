@@ -35,6 +35,28 @@ printf 'Environment: %s\n\n' "$UV_PROJECT_ENVIRONMENT"
 # Keep the editable install explicitly targeted at OpenPI's own interpreter.
 uv pip install --python "$OPENPI_ROOT/.venv/bin/python" -e "$OPENPI_ROOT"
 
+# Hardware smoke tests use the same OpenPI environment for the camera backend
+# and the vendored LinkerHand RS485 SDK. These are runtime extras, not part of
+# OpenPI's upstream lockfile.
+uv pip install \
+  --python "$OPENPI_ROOT/.venv/bin/python" \
+  pyrealsense2 \
+  pymodbus==3.5.1 \
+  pyserial
+
+uv pip check --python "$OPENPI_ROOT/.venv/bin/python"
+
+PYTHONPATH="$ROOT${PYTHONPATH:+:$PYTHONPATH}" \
+  "$OPENPI_ROOT/.venv/bin/python" - <<'PY'
+import pyrealsense2  # noqa: F401
+import pymodbus  # noqa: F401
+import serial  # noqa: F401
+
+from vendor.camera.d435.camera_interface import _load_lerobot_backend
+
+print(f"OpenPI hardware-test dependencies ready; RealSense backend={_load_lerobot_backend()[0]}")
+PY
+
 echo
 echo "Environment installation complete: $OPENPI_ROOT/.venv"
 echo "Next: ./scripts/verify_openpi_env.sh"
