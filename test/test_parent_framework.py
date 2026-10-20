@@ -4,10 +4,10 @@ from types import SimpleNamespace
 
 
 def test_parent_exports_compose_application_commands_and_capture_values():
-    from core.workbench.app import ApplicationService, ApplicationSnapshot, CommandResult
-    from core.workbench.app.config_store import _deep_merge
-    from core.workbench.core import Command, WorkflowState
-    from core.workbench.recording import CaptureFrame
+    from teleop.gello_cr.app import ApplicationService, ApplicationSnapshot, CommandResult
+    from teleop.gello_cr.app.config_store import _deep_merge
+    from teleop.gello_cr.core import Command, WorkflowState
+    from teleop.gello_cr.recording import CaptureFrame
 
     service = ApplicationService(handlers={Command.CONNECT: lambda payload: payload["name"]})
     result = service.dispatch(Command.CONNECT, {"name": "offline-fake"})
@@ -26,20 +26,20 @@ def test_parent_exports_compose_application_commands_and_capture_values():
 
 
 def test_parent_ui_owns_the_implementation_and_designer_resources():
-    import hmi.collection
-    from hmi.collection.main_window import OperatorMainWindow
-    from hmi.collection.theme import WORKBENCH_STYLESHEET
+    import teleop.gello_cr.ui
+    from teleop.gello_cr.ui.main_window import OperatorMainWindow
+    from teleop.gello_cr.ui.theme import WORKBENCH_STYLESHEET
 
-    assert OperatorMainWindow.__module__ == "hmi.collection.main_window"
-    root = Path(hmi.collection.__file__).parent
+    assert OperatorMainWindow.__module__ == "teleop.gello_cr.ui.main_window"
+    root = Path(teleop.gello_cr.ui.__file__).parent
     assert (root / "forms/main_window.ui").is_file()
     assert (root / "forms/pages/collection_page.ui").is_file()
     assert WORKBENCH_STYLESHEET
 
 
 def test_parent_entry_check_only_reports_state_and_closes_application(tmp_path, capsys):
-    from core.workbench.core import WorkflowState
-    from hmi.collection.__main__ import main
+    from teleop.gello_cr.core import WorkflowState
+    from teleop.gello_cr.ui.__main__ import main
 
     closed, built = [], []
     operator = SimpleNamespace(

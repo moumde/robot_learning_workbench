@@ -43,7 +43,7 @@ class SampledCamera:
 
 
 def camera_group(serials=("BASE", "LEFT", "RIGHT")):
-    from core.hardware.cameras import SharedCameraGroup
+    from teleop.gello_cr.hardware.cameras import SharedCameraGroup
 
     devices = []
 
@@ -220,7 +220,7 @@ def test_status_snapshot_does_not_wait_for_device_startup():
     import threading
     import time
 
-    from core.workbench.bootstrap.camera_service import CameraPollingService
+    from teleop.gello_cr.bootstrap.camera_service import CameraPollingService
 
     group, devices = camera_group()
     entered, release = threading.Event(), threading.Event()

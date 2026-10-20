@@ -4,7 +4,7 @@
 
 ## 状态、动作与时间
 
-`core/workbench/recording/schema.py` 和 `core/workbench/data_contract.py` 定义固定顺序；不要根据字段历史前缀推断机器人型号。TCP 字段沿用 `cr5.*`，joint 字段为 `cr3.*`，本部署硬件 Profile 为 CR3A + O6。
+`teleop/gello_cr/recording/schema.py` 和 `teleop/gello_cr/support/data_contract.py` 定义固定顺序；不要根据字段历史前缀推断机器人型号。TCP 字段沿用 `cr5.*`，joint 字段为 `cr3.*`，本部署硬件 Profile 为 CR3A + O6。
 
 | 模式 | `observation.state` | `action` |
 | --- | --- | --- |
@@ -66,8 +66,8 @@ O6 六维顺序是拇指弯曲、拇指侧摆、食指、中指、无名指、�
 数据集页的 UNCHECKED 表示尚未执行本次显式校验；VALID / INVALID 来自对应格式 Worker。CLI 自动识别已完成的本地数据格式，只读检查：
 
 ```bash
-./scripts/run_nrc.sh python -m core.workbench.recording.validate_dataset /path/to/final_dataset
-./scripts/run_nrc.sh python -m core.workbench.recording.validate_dataset --help
+./scripts/run_nrc.sh python -m teleop.gello_cr.recording.validate_dataset /path/to/final_dataset
+./scripts/run_nrc.sh python -m teleop.gello_cr.recording.validate_dataset --help
 ```
 
 校验解释器需要该格式的校验依赖。校验失败返回非零状态并报告原因；训练数据结构校验与现场动作成功率、相机安装质量是不同验收项。

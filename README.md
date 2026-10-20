@@ -41,7 +41,7 @@ Ubuntu 上首次部署：
 
 ## GELLO 遥操与数据采集
 
-采集 UI 位于 `hmi/collection`，共享状态机/运行时/Recorder 位于 `core/workbench`，设备管理位于 `core/hardware`；GELLO 目录保留具体主设备与控制策略。参见 [父级框架说明](docs/parent_workbench_framework.md)。
+遥操界面、控制、设备适配和采集实现统一放在 `teleop/gello_cr/` 的职责子目录，SDK 复用父 `vendor/`。日常操作先看 [遥操快速开始](teleop/README.md)，源码边界见 [模块与父项目](docs/parent_workbench_framework.md)。
 
 安装 NRC 环境中的界面/硬件依赖及独立 V2.1 Writer，再执行只读配置检查：
 
@@ -60,8 +60,8 @@ Ubuntu 上首次部署：
 独立轨迹 CLI 入口为 `scripts/run_gello_replay.sh`，默认预览，真实回放需显式 `--execute`；
 部署界面提供采集入口和共享轨迹任务。安装和运行脚本支持 `--help`。
 完整安装、可选 V3 Writer、配置、预览和工作流格式见 [GELLO 集成说明](docs/gello_cr_integration.md)，详细维护指南见
-[docs/teleop](docs/teleop/architecture.md)。无硬件窗口示例为 `examples/preview_collection.py`，
-诊断工具为 `tools/workbench_diagnostics.py`，使用父 NRC 环境运行。真机联调尚未完成。
+[docs/teleop](docs/teleop/architecture.md)。运行和失败日志自动写入父 `logs/teleop.log`。无硬件窗口示例为 `teleop/gello_cr/examples/preview_collection.py`，
+诊断工具为 `teleop/gello_cr/tools/workbench_diagnostics.py`，使用父 NRC 环境运行。真机联调尚未完成。
 
 ## 命令行常用操作
 
@@ -89,18 +89,16 @@ OpenPI、LeRobot 和 GPU 环境检查：
 ```text
 config/hardware/     硬件 profile（机器人、相机和手）
 core/openpi/         OpenPI 训练外的部署与回放业务
-hmi/                 训练、部署与遥操采集桌面界面
+hmi/                 训练与部署桌面界面
 module/openpi/       本项目维护的 OpenPI 源码
 module/nrc/          NRC Python 环境目录（不提交虚拟环境）
 module/gello_writers/ 独立的 V2.1/V3 数据 Writer 环境（不提交虚拟环境）
-teleop/gello_cr/     GELLO 主设备、映射和跟随策略
+teleop/gello_cr/     遥操 UI、控制、设备适配、采集、工具和测试
 vendor/              硬件与厂商接口适配
 dataset/              本地训练、恢复批次和回放数据（不提交）
 checkpoints/          模型检查点（不提交）
 tasks/                可保存的任务流配置
 scripts/              环境、验证和启动脚本
-tools/                离线诊断、轨迹迁移与采集仿真
-examples/             无硬件窗口预览
 docs/teleop/          遥操架构、配置、数据、硬件和迁移指南
 ```
 

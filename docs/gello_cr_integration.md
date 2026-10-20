@@ -1,10 +1,10 @@
 # GELLO 遥操与父工作台集成
 
-父项目正式入口是 `scripts/run_teleop.sh`，运行 `python -m hmi.collection`。
+父项目正式入口是 `scripts/run_teleop.sh`，运行 `python -m teleop.gello_cr.ui`。
 启动界面处于 OFFLINE / IDLE；连接机器人、使能、启动跟随、相机和采集均需人工操作。
-`--check-only` 仅加载并校验配置，不连接设备。GELLO 模块源代码位于
-`teleop/gello_cr/devices/` 和 `teleop/gello_cr/control/`；共享实现由父 `core/workbench/`、
-`core/hardware/` 和 `hmi/collection/` 直接维护。详细指南位于 [docs/teleop](teleop/architecture.md)。
+`--check-only` 仅加载并校验配置，不连接设备。遥操的界面、运行时、控制、采集和设备适配均位于 `teleop/gello_cr/` 的职责子目录；
+SDK 复用父 `vendor/`，配置、数据和日志使用父项目目录。日常操作见
+[遥操快速开始](../teleop/README.md)，详细指南位于 [docs/teleop](teleop/architecture.md)。
 
 ## 配置与共享 SDK
 
@@ -84,20 +84,21 @@ NRC、V2.1 与 HDF5 环境由上述脚本安装；V3 安装需显式选择源码
 中断恢复先人工处理 Partial，再创建新 Segment；原 Segment、journal 和失败信息保留。
 恢复不会自动连接设备、开始采样或恢复运动。详细操作见
 [数据格式与恢复说明](teleop/dataset.md)。只读 CLI 校验使用
-`./scripts/run_nrc.sh python -m core.workbench.recording.validate_dataset --help`。
+`./scripts/run_nrc.sh python -m teleop.gello_cr.recording.validate_dataset --help`。
 
-默认日志输出到终端，需要文件时写入父项目 `logs/`，例如在仓库根目录执行：
+遥操及父工作流日志同时输出到终端和父项目 `logs/teleop.log`，自动保留启动、命令失败及异常堆栈。
+操作失败后按界面显示的时间和命令查找日志末尾；无需手动重定向：
 
 ```bash
-./scripts/run_teleop.sh > logs/gello_cr.log 2>&1
+tail -n 150 logs/teleop.log
 ```
 
 ## 诊断与离线工具
 
-从仓库根目录执行 `./scripts/run_nrc.sh python tools/workbench_diagnostics.py`，
+从仓库根目录执行 `./scripts/run_nrc.sh python teleop/gello_cr/tools/workbench_diagnostics.py`，
 打印解释器、版本、配置和解析后的数据目录，不构造设备会话。
-无硬件窗口预览为 `./scripts/run_nrc.sh python examples/preview_collection.py`。
-历史 JSON 的一次性转换使用 `tools/migrate_legacy_trajectory.py`，见
+无硬件窗口预览为 `./scripts/run_nrc.sh python teleop/gello_cr/examples/preview_collection.py`。
+历史 JSON 的一次性转换使用 `teleop/gello_cr/tools/migrate_legacy_trajectory.py`，见
 [迁移说明](teleop/migration_v1.md)；源轨迹保持只读。
 
 ## 轨迹预览与人工执行

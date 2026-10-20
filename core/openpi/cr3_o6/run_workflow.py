@@ -61,6 +61,7 @@ from core.trajectory_bridge import (  # noqa: E402
     play_in_existing_session,
     validate_session_trajectory,
 )
+from teleop.gello_cr.support.logging_config import configure_logging  # noqa: E402
 
 LOGGER = logging.getLogger("cr3_o6_workflow")
 
@@ -104,7 +105,7 @@ def _validate_plan(plan: Any) -> list[dict[str, Any]]:
                 if type(task.get("hand_enabled", False)) is not bool:
                     raise ValueError(f"Shared trajectory task {index} hand_enabled must be boolean")
                 # Use the same bounded options as the GELLO Player.
-                from core.workbench.trajectory.validation import validate_options
+                from teleop.gello_cr.trajectory.validation import validate_options
 
                 validate_options(_shared_options(task))
         elif kind == "ptp":
@@ -352,7 +353,7 @@ def _run_ptp_task(
             )
 
 
-def run_workflow(
+def _run_workflow(
     *,
     tasks: list[dict[str, Any]],
     config_path: str | None,
@@ -615,6 +616,22 @@ def run_workflow(
     return exit_code
 
 
+def run_workflow(
+    *,
+    tasks: list[dict[str, Any]],
+    config_path: str | None,
+    policy_host: str,
+    policy_port: int,
+) -> int:
+    configure_logging(repo_root=REPO_ROOT)
+    try:
+        return _run_workflow(tasks=tasks, config_path=config_path,
+                             policy_host=policy_host, policy_port=policy_port)
+    except Exception:
+        LOGGER.exception("Workflow startup or execution failed")
+        raise
+
+
 def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--config", default=None, help="Hardware profile TOML")
@@ -626,16 +643,12 @@ def _parser() -> argparse.ArgumentParser:
 
 
 def main() -> int:
+    configure_logging(repo_root=REPO_ROOT)
     args = _parser().parse_args()
     if not args.confirm_motion:
         raise SystemExit("Real robot workflow requires --confirm-motion")
     if not 1 <= args.port <= 65535:
         raise SystemExit("--port must be between 1 and 65535")
-    logging.basicConfig(
-        level=logging.INFO,
-        format="%(asctime)s %(levelname)s %(name)s: %(message)s",
-        force=True,
-    )
     try:
         tasks = _validate_plan(json.loads(args.plan_json))
         return run_workflow(

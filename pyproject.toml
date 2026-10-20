@@ -10,8 +10,8 @@ requires-python = ">=3.12"
 dependencies = ["numpy>=1.26", "opencv-python>=4.8", "pyserial>=3.5", "pyarrow>=15"]
 
 [project.scripts]
-robot-workbench = "hmi.collection.__main__:main"
-gello-replay = "core.workbench.replay:main"
+robot-workbench = "teleop.gello_cr.ui.__main__:main"
+gello-replay = "teleop.gello_cr.cli.replay:main"
 
 [project.optional-dependencies]
 ui = ["PySide6-Essentials>=6.7"]
@@ -23,21 +23,22 @@ dev = ["pytest>=8.0", "ruff>=0.6"]
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["core", "core.workbench*", "core.hardware*", "hmi", "hmi.collection*", "teleop", "teleop.gello_cr*", "teleop.devices*", "config*", "vendor", "vendor.nrc_interface*", "vendor.camera*"]
+exclude = ["teleop.gello_cr.tests*", "teleop.gello_cr.examples*"]
+include = ["core", "hmi", "teleop", "teleop.gello_cr*", "config*", "vendor", "vendor.nrc_interface*", "vendor.camera*"]
 
 [tool.setuptools.package-data]
-"hmi.collection" = ["forms/*.ui", "forms/pages/*.ui", "forms/widgets/*.ui", "styles/*.qss"]
+"teleop.gello_cr.ui" = ["forms/*.ui", "forms/pages/*.ui", "forms/widgets/*.ui", "styles/*.qss"]
 "config" = ["hardware/*.toml", "teleop/*.json"]
 
 [tool.pytest.ini_options]
 pythonpath = ["."]
-testpaths = ["test"]
+testpaths = ["test", "teleop/gello_cr/tests"]
 addopts = "-m 'not hardware'"
 markers = ["hardware: explicitly selected real-device acceptance tests"]
 
 [tool.ruff]
 target-version = "py312"
 line-length = 100
-extend-exclude = ["hmi/collection/generated", "vendor", "module"]
+extend-exclude = ["teleop/gello_cr/ui/generated", "vendor", "module"]
 [tool.ruff.lint]
 select = ["E4", "E7", "E9", "F", "I", "UP", "B"]

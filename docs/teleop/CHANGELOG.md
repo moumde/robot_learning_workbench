@@ -2,9 +2,9 @@
 
 ## 未发布 — 父工作台源码整理（2026-10-20）
 
-- 移除独立包兼容入口和嵌套脚本，正式入口统一为父 `hmi.collection`、共享回放 CLI 与父启动脚本。
-- GELLO 设备和控制策略分别归入 `teleop/gello_cr/devices/`、`control/`；共享实现保留在父 `core/` 与 `hmi/`。
-- 工具、离线示例和维护指南统一放在父 `tools/`、`examples/`、`docs/teleop/`。重复配置保留为忽略的本地参考副本，运行配置使用 `config/teleop/gello_cr.json` 和硬件 TOML。
+- 移除独立包兼容入口和嵌套脚本，正式入口为 `teleop.gello_cr.ui`、`teleop.gello_cr.cli.replay` 与父启动脚本。
+- 遥操的 UI、应用、设备适配、控制、运动、轨迹和采集都按职责放在 `teleop/gello_cr/` 子目录；SDK 复用父 `vendor/`。
+- 工具、离线示例和模块测试分别放在 `teleop/gello_cr/tools/`、`examples/`、`tests/`，维护指南保留在父 `docs/teleop/`。运行配置使用 `config/teleop/gello_cr.json` 和硬件 TOML，数据与失败日志使用父 `dataset/` 和 `logs/`。
 
 ## 未发布 — Designer 与采集工作流（2026-10-17）
 

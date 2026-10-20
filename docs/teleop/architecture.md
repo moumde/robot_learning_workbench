@@ -1,25 +1,25 @@
 # 架构与生命周期
 
-父工作台采用一个正式 HMI、一个应用命令入口和一个运动仲裁器。页面只提交命令和显示快照；设备 SDK、运动执行和 Dataset Writer 均不由页面直接调用。正式入口是仓库根目录的 `scripts/run_teleop.sh`（`python -m hmi.collection`），启动保持 OFFLINE / IDLE。
+遥操模块采用一个正式 HMI、一个应用命令入口和一个运动仲裁器。页面只提交命令和显示快照；设备 SDK、运动执行和 Dataset Writer 均不由页面直接调用。正式入口是仓库根目录的 `scripts/run_teleop.sh`（`python -m teleop.gello_cr.ui`），启动保持 OFFLINE / IDLE。
 
 ## 依赖与权威状态
 
 ```text
-hmi/collection → core/workbench/app + core/workbench/core
-core/workbench/composition + bootstrap → 应用 + 硬件 + recording + HMI（组合根）
-core/workbench/app → 运动 + 轨迹 + recording + 设备接口
-core/workbench/motion → 执行器 / 设备适配接口
-core/workbench/trajectory → 模型 / Store / Recorder / Planner / Player → motion
-core/workbench/recording → CaptureFrame / Session → 独立 Worker → 格式 Writer
-core/hardware + teleop/*/devices → vendor SDK / 串口 / 网络
+teleop/gello_cr/ui → teleop/gello_cr/app + teleop/gello_cr/core
+teleop/gello_cr/bootstrap/composition + runtime_factory → 应用 + 硬件 + recording + HMI（组合根）
+teleop/gello_cr/app → 运动 + 轨迹 + recording + 设备接口
+teleop/gello_cr/motion → 执行器 / 设备适配接口
+teleop/gello_cr/trajectory → 模型 / Store / Recorder / Planner / Player → motion
+teleop/gello_cr/recording → CaptureFrame / Session → 独立 Worker → 格式 Writer
+teleop/gello_cr/hardware + devices → 父 vendor SDK / 串口 / 网络
 teleop/gello_cr/control → GELLO 映射、运动学和跟随策略
 ```
 
-`ApplicationService` 串行分发普通命令，`WorkflowStateMachine` 管理转换，`core/workbench/app/permissions.py` 结合缓存设备状态、Episode 和 Dataset 快照判断许可并给出拒绝原因；STOP、FAULT、ESTOP 可以优先抢占普通操作。HMI 的按钮、快捷键和菜单使用相同命令策略，不另存一份许可状态。`TeleopRuntime` 保留应用 Facade，具体工作由 `TeleopService`、`HomeService`、`HandActions`、`TrajectoryService`、`CaptureSnapshot` 和 `PointMotionService` 承担。
+`ApplicationService` 串行分发普通命令，`WorkflowStateMachine` 管理转换，`teleop/gello_cr/app/permissions.py` 结合缓存设备状态、Episode 和 Dataset 快照判断许可并给出拒绝原因；STOP、FAULT、ESTOP 可以优先抢占普通操作。HMI 的按钮、快捷键和菜单使用相同命令策略，不另存一份许可状态。`TeleopRuntime` 保留应用 Facade，具体工作由 `TeleopService`、`HomeService`、`HandActions`、`TrajectoryService`、`CaptureSnapshot` 和 `PointMotionService` 承担。
 
 ## UI 边界
 
-`hmi/collection/forms/` 的八份 Designer 表单维护主窗口、采集、轨迹、规划、数据集、机器人状态、设置和恢复面板的静态布局；`module/nrc/.venv/bin/python scripts/generate_collection_ui.py` 生成 `hmi/collection/generated/`。`hmi/collection/styles/app.qss` 使用 role/state 属性统一样式。设置中的配置字段和规划表格行按 schema/数据动态生成。
+`teleop/gello_cr/ui/forms/` 的八份 Designer 表单维护主窗口、采集、轨迹、规划、数据集、机器人状态、设置和恢复面板的静态布局；`module/nrc/.venv/bin/python scripts/generate_collection_ui.py` 生成 `teleop/gello_cr/ui/generated/`。`teleop/gello_cr/ui/styles/app.qss` 使用 role/state 属性统一样式。设置中的配置字段和规划表格行按 schema/数据动态生成。
 
 MainWindow 负责导航、命令通道和一次 Presenter poll；同一 UiFrame 分发给全部页面。CollectionPage 绑定表单与信号，CollectionController 负责步骤提示、表单锁定、结果选择和保存回执；CameraPreviewRenderer 负责缓存图像转换，status_presenter 负责跨页状态和错误横幅。UI 不直接调用 SDK 或 Writer。
 

@@ -101,7 +101,7 @@ class Guard:
 
 
 def test_parent_adapter_delegates_reads_and_servo_preserving_external_axis(monkeypatch):
-    from core.hardware.cr3a import Cr3aConfig, Cr3aDevice
+    from teleop.gello_cr.hardware.cr3a import Cr3aConfig, Cr3aDevice
     from vendor.nrc_interface.interface import CR3Interface
 
     sdk, guard = Sdk(), Guard()
@@ -139,7 +139,7 @@ def test_parent_adapter_delegates_reads_and_servo_preserving_external_axis(monke
 
 
 def test_parent_adapter_home_movej_uses_shared_command_channel():
-    from core.hardware.cr3a import Cr3aConfig, Cr3aDevice
+    from teleop.gello_cr.hardware.cr3a import Cr3aConfig, Cr3aDevice
 
     sdk, guard = Sdk(), Guard()
     device = Cr3aDevice(Cr3aConfig(ip='simulation.invalid'), api=sdk, session_guard=guard)
@@ -157,7 +157,7 @@ def test_parent_adapter_home_movej_uses_shared_command_channel():
 
 
 def test_parent_adapter_retains_endpoint_guard_until_disconnect_succeeds():
-    from core.hardware.cr3a import Cr3aConfig, Cr3aDevice
+    from teleop.gello_cr.hardware.cr3a import Cr3aConfig, Cr3aDevice
 
     sdk, guard = Sdk(), Guard()
     device = Cr3aDevice(Cr3aConfig(ip='simulation.invalid'), api=sdk, session_guard=guard)
@@ -173,7 +173,7 @@ def test_parent_adapter_retains_endpoint_guard_until_disconnect_succeeds():
 
 
 def test_partial_close_cannot_report_connected_even_if_sdk_accepts_missing_fd():
-    from core.hardware.cr3a import Cr3aConfig, Cr3aDevice
+    from teleop.gello_cr.hardware.cr3a import Cr3aConfig, Cr3aDevice
     sdk, guard = Sdk(), Guard()
     device = Cr3aDevice(Cr3aConfig(ip="simulation.invalid"), api=sdk, session_guard=guard)
     device.connect(timeout=0.1)

@@ -1,6 +1,6 @@
 # 配置、单位与环境覆盖
 
-正式遥操配置为父项目 `config/teleop/gello_cr.json`，硬件配置为 `config/hardware/*.toml`。组合入口 `core.workbench.composition.IntegratedConfigStore` 要求文件存在，缺失会明确报错，不会静默启动默认硬件配置。加载时合并 `DEFAULT_CONFIG` 补充缺省字段；显式保存的 O6 动作库作为完整库，不自动补回已删除动作。设置保存先校验，再写同目录 `.tmp` 并 `os.replace`。在连接设备前修改，保存后重启应用。
+正式遥操配置为父项目 `config/teleop/gello_cr.json`，硬件配置为 `config/hardware/*.toml`。组合入口 `teleop.gello_cr.bootstrap.composition.IntegratedConfigStore` 要求文件存在，缺失会明确报错，不会静默启动默认硬件配置。加载时合并 `DEFAULT_CONFIG` 补充缺省字段；显式保存的 O6 动作库作为完整库，不自动补回已删除动作。设置保存先校验，再写同目录 `.tmp` 并 `os.replace`。在连接设备前修改，保存后重启应用。
 
 ## 部署身份与连接
 
@@ -64,7 +64,7 @@
 | `GELLO_CR_PYTHON` / `NRC_PYTHON` / `NRC_ENV` | 父启动脚本依次选择应用解释器；缺省为 `module/nrc/.venv/bin/python`，要求 Python 3.12 |
 | `GELLO_CR_DATA_PYTHON` | 覆盖数据 Worker 的回退解释器；格式专属 `worker_pythons[format]` 优先。独立校验 CLI 使用调用它的解释器 |
 | `GELLO_CR_OPENPI_ROOT` | 可选 DAgger 外部 OpenPI 根目录；只有显式启动集成时使用 |
-| `WORKBENCH_ROOT` / `GELLO_CR_REPO_ROOT` | 直接 `python -m hmi.collection` 时的仓库定位；`--repo-root` 优先，缺省从父源码定位 |
+| `WORKBENCH_ROOT` / `GELLO_CR_REPO_ROOT` | 直接 `python -m teleop.gello_cr.ui` 时的仓库定位；`--repo-root` 优先，缺省从父源码定位 |
 | `GELLO_TEST_V21_PYTHON` / `GELLO_TEST_V3_PYTHON` | 仅官方格式离线回归的 Worker 环境，不是运行时配置 |
 
-父 `run_nrc.sh` 将仓库根目录加入 `PYTHONPATH`、切换到仓库根目录并设置解释器库路径。`./scripts/run_nrc.sh python tools/workbench_diagnostics.py` 打印版本、Git commit、解释器、Profile 和解析后的数据路径，不构造设备会话。缺少文件、非法 Profile、端口、采样频率或规划约束应先修正配置，不通过绕过校验来启动。
+父 `run_nrc.sh` 将仓库根目录加入 `PYTHONPATH`、切换到仓库根目录并设置解释器库路径。`./scripts/run_nrc.sh python teleop/gello_cr/tools/workbench_diagnostics.py` 打印版本、Git commit、解释器、Profile 和解析后的数据路径，不构造设备会话。缺少文件、非法 Profile、端口、采样频率或规划约束应先修正配置，不通过绕过校验来启动。
