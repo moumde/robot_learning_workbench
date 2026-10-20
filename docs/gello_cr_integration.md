@@ -1,6 +1,6 @@
 # GELLO 遥操与父工作台集成
 
-父项目正式入口是 `scripts/run_teleop.sh`，运行 `python -m teleop.gello_cr`。
+父项目正式入口是 `scripts/run_teleop.sh`，运行 `python -m hmi.collection`。
 启动界面处于 OFFLINE / IDLE；连接机器人、使能、启动跟随、相机和采集均需人工操作。
 `--check-only` 仅加载并校验配置，不连接设备。GELLO 模块源代码位于
 `teleop/gello_cr/`，该目录原有说明保留了独立部署的背景；父项目部署以本文为准。
@@ -47,7 +47,7 @@ GELLO 采样接口保留成功总线读数的 monotonic 时间戳，重复读取
 ```
 
 `setup_teleop_env.sh` 只在默认 NRC 环境缺失时调用 `setup_nrc_env.sh`，然后安装
-本地 `teleop/gello_cr[ui,hdf5,data-validation]`、Dynamixel SDK、RealSense、PyAV 数据校验和 O6 Modbus 依赖。
+父项目 `.[ui,hdf5,data-validation]`、Dynamixel SDK、RealSense、PyAV 数据校验和 O6 Modbus 依赖。
 指定 `GELLO_CR_PYTHON` 或 `NRC_PYTHON` 时须先创建该 Python 3.12 环境。
 脚本不安装 `vendor/gello/requirements.txt`，也不向界面进程安装 LeRobot 或训练栈。
 
@@ -72,7 +72,7 @@ GELLO_V3_LEROBOT_SPEC=/opt/verified/lerobot \
   ./scripts/setup_gello_writer_env.sh v3
 ```
 
-本次已在新克隆安装 NRC、V2.1 与 HDF5 环境；V3 安装仍由使用方显式选择源码。V3 安装结束会检查接口；
+NRC、V2.1 与 HDF5 环境由上述脚本安装；V3 安装需显式选择源码。V3 安装结束会检查接口；
 仍须针对所选源码完成格式回归后再采集。不要把两个版本装入同一环境，也不要修改 OpenPI 环境解决 Writer 依赖。
 
 ## 数据、恢复与日志
@@ -152,5 +152,3 @@ HMI 保存的任务文件使用 `dataset_dir` / `repeat_count`，由 HMI 转成�
 
 集成验证仅覆盖离线行为、内存设备和临时数据。真实 CR3/O6/GELLO、三相机采集、
 现场运动限制及急停流程尚未联调验收；离线验证通过不表示真机可直接投入使用。
-
-本次实施与实际验证结果见 [融合验证记录](gello_integration_validation.md)。
