@@ -1,6 +1,6 @@
 # HMI
 
-`collection/` 为父级遥操与数据采集控制台，启动 `./scripts/run_teleop.sh`；`deploy/` 保留部署与任务工作流控制台。采集界面布局由 `collection/forms/` 的 Qt Designer `.ui` 维护，修改后运行 `module/nrc/.venv/bin/python scripts/generate_collection_ui.py`。共享架构见 [父级框架](../docs/parent_workbench_framework.md)。
+`collection/` 为父级遥操与数据采集控制台，启动 `./scripts/run_teleop.sh`；`deploy/` 保留部署与任务工作流控制台。采集界面布局由 `collection/forms/` 的 Qt Designer `.ui` 维护，修改后运行 `module/nrc/.venv/bin/python scripts/generate_collection_ui.py`。共享架构见 [父级框架](../docs/parent_workbench_framework.md)和[详细指南](../docs/teleop/architecture.md)。无硬件预览使用 `./scripts/run_nrc.sh python examples/preview_collection.py`。
 
 基于 PySide6 的 CR3/O6 桌面控制台。它读取 `config/hardware/` 下的硬件 profile，
 可启动/停止 OpenPI policy server，并管理 PI05 推理、完整 LeRobot 数据集重播和 CR3 走点轨迹重播任务。

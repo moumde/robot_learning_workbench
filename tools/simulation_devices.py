@@ -26,7 +26,7 @@ import numpy as np
 
 from core.hardware.realsense import RealSenseRgbConfig
 from core.workbench.core.contracts import CameraSnapshot, HandSnapshot
-from teleop.gello_cr.device import GelloFeedback
+from teleop.gello_cr.devices.gello import GelloFeedback
 
 
 def _six_bytes(values: Sequence[Any]) -> tuple[int, ...]:

@@ -83,8 +83,8 @@ class RuntimeConstructors:
         from core.workbench.recording.session import RecordingSession
         from teleop.devices.inverse3 import Inverse3Controller
         from teleop.devices.roarm import RoArmSerialController
-        from teleop.gello_cr.controller import TeleopController
-        from teleop.gello_cr.device import GelloController
+        from teleop.gello_cr.control.controller import TeleopController
+        from teleop.gello_cr.devices.gello import GelloController
 
         return cls(
             TeleopConfigStore=TeleopConfigStore.from_file,

@@ -16,7 +16,7 @@ from core.trajectory_bridge import (
 
 # isort: split
 
-from gello_cr.trajectory import (
+from core.workbench.trajectory import (
     ReplayMode,
     ReplayOptions,
     TrajectoryFrame,
@@ -58,7 +58,7 @@ def test_v3_discovers_actual_episode_indices_and_preserves_tcp_delta_semantics(t
 
 
 def test_parent_ptp_import_converts_only_tcp_translation_from_mm_to_m(tmp_path):
-    from gello_cr.trajectory.adapters import LeRobotTrajectoryAdapter
+    from core.workbench.trajectory.adapters import LeRobotTrajectoryAdapter
 
     item = row(0)
     item.update(

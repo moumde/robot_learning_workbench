@@ -305,7 +305,9 @@ uv pip install --python module/nrc/.venv/bin/python \
 `config/teleop/gello_cr.json`。训练数据、恢复批次、命名轨迹分别位于 `dataset/train/`、
 `dataset/staging/`、`dataset/replay/trajectories/`。
 独立轨迹 CLI 默认预览，真实回放需显式 `--execute`；父 HMI 提供采集入口和共享轨迹任务。
-完整安装、配置、预览和工作流格式见 [集成说明](docs/gello_cr_integration.md)。真机联调尚未完成。
+完整安装、配置、预览和工作流格式见 [集成说明](docs/gello_cr_integration.md)，详细维护指南见
+[docs/teleop](docs/teleop/architecture.md)。无硬件窗口示例为 `examples/preview_collection.py`，
+诊断工具为 `tools/workbench_diagnostics.py`，使用父 NRC 环境运行。真机联调尚未完成。
 
 ## 4. 硬件测试
 
@@ -407,6 +409,9 @@ robot_learning_workbench/
 ├── checkpoints/            # 模型权重，不进 Git
 ├── thirdparty/             # 确实需要 vendoring 的第三方代码
 ├── scripts/                # 部署、环境、验证和启动脚本
+├── tools/                  # 离线诊断、轨迹迁移与采集仿真
+├── examples/               # 无硬件窗口预览
+├── docs/teleop/            # 遥操架构、配置、数据、硬件和迁移指南
 └── logs/                   # 本地运行日志，不进 Git
 ```
 

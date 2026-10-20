@@ -44,7 +44,7 @@ from .trajectory_source import RuntimeTrajectorySource
 
 def _default_teleop_controller(*args, **kwargs):
     """Retain direct runtime construction without loading a master plugin at import."""
-    from teleop.gello_cr.controller import TeleopController
+    from teleop.gello_cr.control.controller import TeleopController
 
     return TeleopController(*args, **kwargs)
 
