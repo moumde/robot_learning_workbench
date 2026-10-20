@@ -1,22 +1,8 @@
-"""Canonical robot-learning capture values, independent of storage formats."""
+"""Compatibility alias for core.workbench.recording.frame; no duplicated implementation."""
 
-from collections.abc import Mapping
-from dataclasses import dataclass, field
-from typing import Any
+import sys as _sys
+from importlib import import_module as _import_module
 
-import numpy as np
+_implementation = _import_module('core.workbench.recording.frame')
 
-
-@dataclass(frozen=True, slots=True)
-class CaptureFrame:
-    timestamp: float
-    observation_state: tuple[float, ...]
-    action: tuple[float, ...]
-    images: Mapping[str, np.ndarray]
-    robot_joint_state: tuple[float, ...] | None = None
-    robot_joint_command: tuple[float, ...] | None = None
-    robot_tcp_state: tuple[float, ...] | None = None
-    robot_tcp_command: tuple[float, ...] | None = None
-    hand_state: tuple[float, ...] | None = None
-    hand_command: tuple[float, ...] | None = None
-    metadata: Mapping[str, Any] = field(default_factory=dict)
+_sys.modules[__name__] = _implementation

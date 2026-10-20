@@ -1,23 +1,8 @@
-"""Errors shared by capture, sessions, and writer implementations."""
+"""Compatibility alias for core.workbench.recording.errors; no duplicated implementation."""
 
-from gello_cr.errors import RecordingError as RecordingError
+import sys as _sys
+from importlib import import_module as _import_module
 
+_implementation = _import_module('core.workbench.recording.errors')
 
-class CaptureValidationError(RecordingError, ValueError):
-    pass
-
-
-class WriterError(RecordingError):
-    pass
-
-
-class WriterStateError(WriterError):
-    pass
-
-
-class DatasetFinalizeError(WriterError):
-    pass
-
-
-class UnsupportedDatasetFormat(WriterError):
-    pass
+_sys.modules[__name__] = _implementation

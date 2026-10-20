@@ -411,3 +411,83 @@ def test_recording_rechecks_live_source_readiness(
     vm = build_application_view_model(service.snapshot(), {}, {}, ready)
     assert service.can(Command.START_EPISODE, {"source": source}) is allowed
     assert vm.recording_sources[source] is allowed
+
+
+@pytest.mark.parametrize('enabled', [False, True])
+def test_restored_link_reset_reattaches_the_original_session_without_resuming(application, enabled):
+    backend, lifecycle = application
+    backend.service.dispatch(Command.CONNECT)
+    if enabled:
+        backend.service.dispatch(Command.POWER_ON)
+    lifecycle.stop_feedback()
+    session = lifecycle.session
+    lifecycle.device.connected = False
+    lifecycle._refresh_status()
+    assert backend.teleop_engine.robot is None
+    assert backend.presenter.poll().view_model.workflow_state is WorkflowState.FAULT
+
+    lifecycle.device.connected = True
+    session.enabled = False
+    backend.service.dispatch(Command.RESET_FAULT)
+    frame = backend.presenter.poll()
+    assert frame.view_model.workflow_state is (
+        WorkflowState.ROBOT_ENABLED if enabled else WorkflowState.CONNECTED
+    )
+    assert backend.teleop_engine.robot is session
+    assert backend.teleop_engine.state == 'idle'
+    assert session.enabled is enabled
+    assert session.movej_targets == []
+    assert backend.teleop_engine.motion.status.source is None
+
+
+def test_unavailable_link_requires_explicit_disconnect_and_reconnect(application, monkeypatch):
+    backend, lifecycle = application
+    backend.service.dispatch(Command.CONNECT)
+    backend.service.dispatch(Command.POWER_ON)
+    lifecycle.stop_feedback()
+    session, device = lifecycle.session, lifecycle.device
+    device.connected = False
+    lifecycle._refresh_status()
+    backend.presenter.poll()
+
+    with pytest.raises(RuntimeError, match='连接|断开'):
+        backend.service.dispatch(Command.RESET_FAULT)
+    assert backend.service.state is WorkflowState.FAULT
+    assert backend.teleop_engine.robot is None
+    assert backend.service.can(Command.DISCONNECT)
+    assert backend.presenter.poll().view_model.actions[Command.DISCONNECT]
+
+    original_stop = backend.teleop_engine.stop_motion
+    with monkeypatch.context() as guard:
+        guard.setattr(backend.teleop_engine, 'stop_motion', lambda reason: (_ for _ in ()).throw(
+            TimeoutError('producer still using disconnected session')
+        ))
+        with pytest.raises(ExceptionGroup):
+            backend.service.dispatch(Command.DISCONNECT)
+        assert lifecycle.device is device and lifecycle.session is session
+    assert backend.teleop_engine.stop_motion == original_stop
+
+    backend.service.dispatch(Command.DISCONNECT)
+    assert lifecycle.device is None and lifecycle.session is None
+    assert backend.presenter.poll().view_model.workflow_state is WorkflowState.OFFLINE
+    backend.service.dispatch(Command.CONNECT)
+    assert backend.presenter.poll().view_model.workflow_state is WorkflowState.CONNECTED
+    assert backend.teleop_engine.robot is lifecycle.session
+    assert backend.teleop_engine.robot is not session
+    assert backend.teleop_engine.state == 'idle'
+    assert not lifecycle.session.enabled
+
+
+def test_fault_disconnect_keeps_pending_episode_resolution_required(application):
+    backend, lifecycle = application
+    backend.service.dispatch(Command.CONNECT)
+    lifecycle.stop_feedback()
+    lifecycle.device.connected = False
+    lifecycle._refresh_status()
+    backend.presenter.poll()
+    backend.recorder.value.update(episode_pending=True, buffered_frames=4)
+    assert not backend.service.can(Command.DISCONNECT)
+    with pytest.raises(InvalidTransition):
+        backend.service.dispatch(Command.DISCONNECT)
+    assert lifecycle.device is not None
+    backend.recorder.value.update(episode_pending=False, buffered_frames=0)

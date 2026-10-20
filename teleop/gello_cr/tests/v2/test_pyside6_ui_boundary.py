@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-UI_ROOT = Path(__file__).resolve().parents[2] / "src/gello_cr/ui"
+UI_ROOT = Path(__file__).resolve().parents[4] / "hmi/collection"
 
 
 def _source(name: str) -> str:
@@ -49,7 +49,7 @@ def test_window_exposes_stop_episode_command() -> None:
 
 
 def test_preview_explicitly_contains_no_hardware_backend() -> None:
-    source = (UI_ROOT.parents[2] / "examples/preview_ui.py").read_text(encoding="utf-8")
+    source = (Path(__file__).resolve().parents[2] / "examples/preview_ui.py").read_text(encoding="utf-8")
 
     assert "ApplicationService()" in source
     assert "No Hardware" in source

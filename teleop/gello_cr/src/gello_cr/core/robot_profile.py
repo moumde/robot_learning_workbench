@@ -1,29 +1,8 @@
-"""Robot identity and capabilities consumed by generic operator views."""
+"""Compatibility alias for core.workbench.core.robot_profile; no duplicated implementation."""
 
-from dataclasses import dataclass, fields
-from typing import Any
+import sys as _sys
+from importlib import import_module as _import_module
 
+_implementation = _import_module('core.workbench.core.robot_profile')
 
-@dataclass(frozen=True, slots=True)
-class RobotCapabilities:
-    supports_home: bool = False
-    supports_gripper: bool = False
-    supports_dual_arm: bool = False
-    supports_joint_control: bool = False
-    supports_cartesian_control: bool = False
-    supports_freedrive: bool = False
-
-    @classmethod
-    def from_mapping(cls, value: dict[str, Any] | None):
-        data = value or {}
-        return cls(**{field.name: bool(data.get(field.name, False)) for field in fields(cls)})
-
-
-@dataclass(frozen=True, slots=True)
-class RobotDescriptor:
-    profile: str
-    name: str
-    joint_names: tuple[str, ...]
-    end_effector: str
-    hand_required: bool
-    capabilities: RobotCapabilities
+_sys.modules[__name__] = _implementation

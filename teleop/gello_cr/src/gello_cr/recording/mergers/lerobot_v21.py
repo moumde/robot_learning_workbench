@@ -1,7 +1,8 @@
-from .base import JournalDatasetMerger
+"""Compatibility alias for core.workbench.recording.mergers.lerobot_v21; no duplicated implementation."""
 
+import sys as _sys
+from importlib import import_module as _import_module
 
-class LeRobotV21Merger(JournalDatasetMerger):
-    """Rebuild V2.1 parquet, tasks, videos and statistics through the official SDK."""
+_implementation = _import_module('core.workbench.recording.mergers.lerobot_v21')
 
-    format_name = "lerobot_v21"
+_sys.modules[__name__] = _implementation

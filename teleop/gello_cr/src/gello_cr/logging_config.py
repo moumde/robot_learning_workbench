@@ -1,16 +1,8 @@
-"""One UTC logging configuration for the application and its domain services."""
+"""Compatibility alias for core.workbench.logging_config; no duplicated implementation."""
 
-import logging
-import time
+import sys as _sys
+from importlib import import_module as _import_module
 
+_implementation = _import_module('core.workbench.logging_config')
 
-def configure_logging(level="INFO"):
-    logger = logging.getLogger("workbench")
-    if not logger.handlers:
-        handler = logging.StreamHandler()
-        formatter = logging.Formatter("%(asctime)sZ %(levelname)s %(name)s: %(message)s")
-        formatter.converter = time.gmtime
-        handler.setFormatter(formatter)
-        logger.addHandler(handler)
-    logger.setLevel(level)
-    logger.propagate = False
+_sys.modules[__name__] = _implementation

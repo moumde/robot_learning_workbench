@@ -1,26 +1,6 @@
-"""Create a PySide6 window from an already-composed OperatorBackend."""
+"""Compatibility import; implementation lives in the parent workbench."""
 
-from __future__ import annotations
+import sys as _sys
+from importlib import import_module as _import_module
 
-from .backend import OperatorBackend
-
-
-def create_operator_window(
-    backend: OperatorBackend,
-    *,
-    refresh_ms: int = 100,
-    close_callback=None,
-    settings_factory=None,
-):
-    """Return the PySide6 window without starting the GUI event loop or hardware."""
-
-    # Lazy import keeps ordinary V2 unit tests independent of PySide6.
-    from .main_window import OperatorMainWindow
-
-    return OperatorMainWindow(
-        backend.presenter,
-        backend.command_port,
-        refresh_ms=refresh_ms,
-        close_callback=close_callback,
-        settings_factory=settings_factory,
-    )
+_sys.modules[__name__] = _import_module('hmi.collection.session')

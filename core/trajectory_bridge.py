@@ -11,19 +11,18 @@ from pathlib import Path
 import numpy as np
 
 # Register the integrated src package for callers launched from the parent repo.
-import teleop.gello_cr  # noqa: F401
 
 # isort: split
 
-from gello_cr.motion import MotionCoordinator
-from gello_cr.trajectory import (
+from core.workbench.motion import MotionCoordinator
+from core.workbench.trajectory import (
     ReplayMode,
     ReplayOptions,
     TrajectoryPlayer,
     TrajectoryStore,
 )
-from gello_cr.trajectory.adapters import LeRobotTrajectoryAdapter
-from gello_cr.trajectory.validation import (
+from core.workbench.trajectory.adapters import LeRobotTrajectoryAdapter
+from core.workbench.trajectory.validation import (
     hand_target,
     validate_options,
     validate_replay_channels,

@@ -1,13 +1,16 @@
-"""Framework-agnostic application contracts and workflow state."""
+"""Compatibility exports for core.workbench.core; implementation lives in the parent."""
 
-from .contracts import HandDevice, MasterDevice, RobotDevice
-from .state_machine import Command, WorkflowState, WorkflowStateMachine
+from importlib import import_module as _import_module
 
-__all__ = [
-    "Command",
-    "HandDevice",
-    "MasterDevice",
-    "RobotDevice",
-    "WorkflowState",
-    "WorkflowStateMachine",
-]
+_implementation = _import_module('core.workbench.core')
+__all__ = getattr(_implementation, "__all__", [
+    name for name in vars(_implementation) if not name.startswith("_")
+])
+
+
+def __getattr__(name):
+    return getattr(_implementation, name)
+
+
+def __dir__():
+    return sorted(set(globals()) | set(dir(_implementation)))

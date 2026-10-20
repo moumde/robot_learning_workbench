@@ -1,6 +1,7 @@
 """Preview, emergency control and bounded log contracts with real Qt widgets."""
 
 from pathlib import Path
+from tests.fakes.paths import implementation_path
 
 import numpy as np
 import pytest
@@ -17,7 +18,7 @@ ROOT = Path(__file__).resolve().parents[2]
 
 
 def _source(path):
-    return (ROOT / path).read_text(encoding="utf-8")
+    return implementation_path(path).read_text(encoding="utf-8")
 
 
 @pytest.fixture

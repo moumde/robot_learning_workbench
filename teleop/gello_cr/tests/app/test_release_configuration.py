@@ -1,5 +1,7 @@
 import copy
 import json
+import os
+from pathlib import Path
 
 import pytest
 
@@ -18,6 +20,40 @@ def test_deployment_paths_use_config_directory_without_persisting_overrides(tmp_
     assert effective["dataset"]["root"] == str(tmp_path / "dataset/train")
     assert effective["dataset"]["staging_root"] == str(tmp_path / "dataset/staging")
     assert effective["dataset"]["worker_python"] == "/tmp/custom/python"
+    assert store.data == original
+
+
+@pytest.mark.parametrize("source", ["worker_python", "worker_pythons", "environment"])
+@pytest.mark.parametrize("path_kind", ["relative", "home", "absolute"])
+def test_deployment_preserves_virtualenv_python_symlink(tmp_path, monkeypatch, source, path_kind):
+    config_dir = tmp_path / "config"
+    config_dir.mkdir()
+    system_python = tmp_path / "system-python"
+    system_python.write_text("system interpreter", encoding="utf-8")
+    venv_python = tmp_path / ".venv/bin/python"
+    venv_python.parent.mkdir(parents=True)
+    venv_python.symlink_to(system_python)
+    paths = {
+        "relative": "../.venv/bin/python",
+        "home": "~/" + os.path.relpath(venv_python, Path.home()),
+        "absolute": str(venv_python),
+    }
+    store = TeleopConfigStore(config_dir / "workbench.json")
+    monkeypatch.delenv("GELLO_CR_DATA_PYTHON", raising=False)
+    if source == "environment":
+        monkeypatch.setenv("GELLO_CR_DATA_PYTHON", paths[path_kind])
+    elif source == "worker_pythons":
+        store.data["dataset"]["worker_pythons"] = {"hdf5": paths[path_kind]}
+    else:
+        store.data["dataset"]["worker_python"] = paths[path_kind]
+    original = copy.deepcopy(store.data)
+
+    dataset = store.deployment_data()["dataset"]
+
+    configured_python = (
+        dataset["worker_pythons"]["hdf5"] if source == "worker_pythons" else dataset["worker_python"]
+    )
+    assert configured_python == str(venv_python)
     assert store.data == original
 
 

@@ -236,20 +236,23 @@ def test_reset_from_connected_does_not_power_on_robot(tmp_path):
         lifecycle=life.callbacks(),
     ).install()
 
-    service.dispatch(Command.CONNECT)
+    try:
+        service.dispatch(Command.CONNECT)
 
-    assert service.state is WorkflowState.CONNECTED
-    assert life.session.servo_state() == 1
+        assert service.state is WorkflowState.CONNECTED
+        assert life.session.servo_state() == 1
 
-    service.dispatch(Command.EMERGENCY_STOP)
+        service.dispatch(Command.EMERGENCY_STOP)
 
-    assert service.state is WorkflowState.ESTOP
+        assert service.state is WorkflowState.ESTOP
 
-    service.dispatch(Command.RESET_ESTOP)
+        service.dispatch(Command.RESET_ESTOP)
 
-    assert service.state is WorkflowState.CONNECTED
-    assert life.session.servo_state() == 1
-    assert not life.session.servoj_open
+        assert service.state is WorkflowState.CONNECTED
+        assert life.session.servo_state() == 1
+        assert not life.session.servoj_open
+    finally:
+        life.disconnect()
 
 
 def test_reset_from_enabled_restores_enable_but_not_follow(tmp_path):
@@ -278,19 +281,22 @@ def test_reset_from_enabled_restores_enable_but_not_follow(tmp_path):
         lifecycle=life.callbacks(),
     ).install()
 
-    service.dispatch(Command.CONNECT)
-    service.dispatch(Command.POWER_ON)
+    try:
+        service.dispatch(Command.CONNECT)
+        service.dispatch(Command.POWER_ON)
 
-    assert service.state is WorkflowState.ROBOT_ENABLED
-    assert life.session.servo_state() == 3
+        assert service.state is WorkflowState.ROBOT_ENABLED
+        assert life.session.servo_state() == 3
 
-    service.dispatch(Command.EMERGENCY_STOP)
+        service.dispatch(Command.EMERGENCY_STOP)
 
-    # Simulate controller dropping servo power during the safety event.
-    api.state = 1
+        # Simulate controller dropping servo power during the safety event.
+        api.state = 1
 
-    service.dispatch(Command.RESET_ESTOP)
+        service.dispatch(Command.RESET_ESTOP)
 
-    assert service.state is WorkflowState.ROBOT_ENABLED
-    assert life.session.servo_state() == 3
-    assert not life.session.servoj_open
+        assert service.state is WorkflowState.ROBOT_ENABLED
+        assert life.session.servo_state() == 3
+        assert not life.session.servoj_open
+    finally:
+        life.disconnect()

@@ -1,29 +1,8 @@
-"""Narrow writer contract: no sampling, devices, or format-specific fields."""
+"""Compatibility alias for core.workbench.recording.writers.base; no duplicated implementation."""
 
-from collections.abc import Mapping
-from dataclasses import dataclass
-from typing import Any, Protocol
+import sys as _sys
+from importlib import import_module as _import_module
 
-from ..frame import CaptureFrame
-from ..metadata import DatasetSessionMetadata, EpisodeMetadata, EpisodeResult
+_implementation = _import_module('core.workbench.recording.writers.base')
 
-
-@dataclass(frozen=True, slots=True)
-class WriterCapabilities:
-    supports_video: bool
-    supports_raw_images: bool
-    supports_episode_discard: bool
-    supports_structured_robot_state: bool
-
-
-class DatasetWriter(Protocol):
-    format_name: str
-    capabilities: WriterCapabilities
-
-    def open(self, session: DatasetSessionMetadata) -> None: ...
-    def begin_episode(self, metadata: EpisodeMetadata) -> None: ...
-    def add_frame(self, frame: CaptureFrame) -> None: ...
-    def save_episode(self, metadata: EpisodeResult) -> Mapping[str, Any] | None: ...
-    def discard_episode(self) -> None: ...
-    def finalize(self) -> None: ...
-    def close(self) -> None: ...
+_sys.modules[__name__] = _implementation

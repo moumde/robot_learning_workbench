@@ -1,45 +1,8 @@
-"""Hardware-free deployment identity; connected state is supplied by the owner."""
+"""Compatibility alias for core.workbench.diagnostics; no duplicated implementation."""
 
-import platform
-import subprocess
-import sys
+import sys as _sys
+from importlib import import_module as _import_module
 
-from gello_cr import __version__
+_implementation = _import_module('core.workbench.diagnostics')
 
-
-def diagnostic_report(config, repo_root, *, connected_devices=None):
-    try:
-        result = subprocess.run(
-            ["git", "rev-parse", "HEAD"],
-            cwd=repo_root,
-            capture_output=True,
-            text=True,
-            timeout=1,
-            check=False,
-        )
-        commit = result.stdout.strip() if result.returncode == 0 else "unknown"
-    except (OSError, subprocess.TimeoutExpired):
-        commit = "unknown"
-    dataset = config["dataset"]
-    return {
-        "version": __version__,
-        "git_commit": commit,
-        "python": platform.python_version(),
-        "python_executable": sys.executable,
-        "hardware_profile": config["hardware"]["profile"],
-        "master": config["master"]["type"],
-        "connected_devices": dict(connected_devices or {}),
-        "dataset": {
-            key: dataset.get(key)
-            for key in (
-                "format",
-                "fps",
-                "image_size",
-                "recording_mode",
-                "root",
-                "staging_root",
-                "worker_python",
-                "worker_pythons",
-            )
-        },
-    }
+_sys.modules[__name__] = _implementation

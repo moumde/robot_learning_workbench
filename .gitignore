@@ -40,3 +40,8 @@ logs/*
 
 # OpenPI runtime files and caches remain ignored; OpenPI source is tracked by
 # this repository as a regular directory.
+
+# Parent package build and verification caches
+*.egg-info/
+.pytest_cache/
+.ruff_cache/

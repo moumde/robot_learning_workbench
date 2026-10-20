@@ -1,3 +1,5 @@
+> 共享框架已迁入父项目，完整边界见 [父级框架说明](../../docs/parent_workbench_framework.md)。
+
 # Robot Learning Workbench v1.0
 
 此目录已集成到父工作台。当前安装、共享硬件配置、数据路径和启动方式以
@@ -111,19 +113,13 @@ TCP 规划需要实际运动学服务；当前 NRC IK 只有单解，不能保�
 本次 UI 改造的依据见 [UI/UX 架构审计](docs/ui_ux_architecture_audit.md)。
 
 ```text
-config/workbench.json   唯一部署配置
-src/gello_cr/ui/         HMI 页面和命令适配
-src/gello_cr/app/        应用 Facade、HOME / Teleop / Hand / Trajectory 等服务
-src/gello_cr/motion/     仲裁、lease、安全检查、执行器
-src/gello_cr/control/    跟随、映射和保护
-src/gello_cr/trajectory/ 模型、存储、录制、Player、规划器
-src/gello_cr/recording/  CaptureFrame、Session、Writer、恢复和合并
-src/gello_cr/devices/    SDK、设备 I/O、运动学适配
-scripts/                正式启动和统一 CLI 包装
-examples/               合成 UI 预览、历史轨迹输入
- tools/                 只读诊断、一次性迁移工具
-tests/                  离线功能回归和公共 Fake Devices
-vendor/                 设备 SDK
+父 hmi/collection/        Qt UI、Designer 表单和 QSS
+父 core/workbench/        应用、状态机、运动、轨迹与 Recorder
+父 core/hardware/         父 Robot/Camera 组合与 O6 通信管理
+父 config/                统一硬件和遥操配置
+父 dataset/               数据集、恢复批次和回放
+teleop/gello_cr/           GELLO 设备、映射和跟随策略
+src/gello_cr/              过渡兼容导入；无重复实现
 ```
 
 原始代码的处理决定见 [Legacy Audit](docs/legacy_audit.md)，版本变化见 [CHANGELOG](CHANGELOG.md)。
@@ -132,17 +128,16 @@ vendor/                 设备 SDK
 
 ## 开发验证
 
-主要静态布局维护在 `src/gello_cr/ui/forms/`，使用 Qt Designer 编辑；Python 负责信号、状态和动态字段。
-修改 `.ui` 后运行 `python scripts/generate_ui.py`，提交表单和 `ui/generated/` 生成结果，不手工编辑生成代码。
-统一样式位于 `ui/styles/app.qss`。机器人身份与能力由 `RobotDescriptor` / `RobotCapabilities` 提供，
+主要静态布局维护在 父 `hmi/collection/forms/`，使用 Qt Designer 编辑；Python 负责信号、状态和动态字段。
+修改 `.ui` 后运行 父 `module/nrc/.venv/bin/python scripts/generate_collection_ui.py`，提交表单和 `hmi/collection/generated/` 生成结果，不手工编辑生成代码。
+统一样式位于 父 `hmi/collection/styles/app.qss`。机器人身份与能力由 `RobotDescriptor` / `RobotCapabilities` 提供，
 目前只注册真实支持的 `cr3a_o6` 配置；增加驱动时沿用同一采集页，不复制整页。
 
 ```bash
-.venv/bin/python -m pip install -e '.[ui,dev,hdf5,data-validation]'
-.venv/bin/python -m compileall -q src scripts tools examples
-.venv/bin/ruff check src scripts tools examples
-.venv/bin/ruff format --check src scripts tools examples
-.venv/bin/python -m pytest -q
+# 在父 robot_learning_workbench 根目录运行
+./scripts/setup_teleop_env.sh
+module/nrc/.venv/bin/python -m pytest -q
+module/nrc/.venv/bin/python scripts/generate_collection_ui.py
 git diff --check
 ```
 

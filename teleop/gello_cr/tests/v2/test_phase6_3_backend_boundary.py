@@ -4,7 +4,7 @@ from __future__ import annotations
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
-UI_ROOT = ROOT / "src/gello_cr/ui"
+UI_ROOT = Path(__file__).resolve().parents[4] / "hmi/collection"
 
 
 def test_backend_module_has_no_vendor_sdk_imports() -> None:

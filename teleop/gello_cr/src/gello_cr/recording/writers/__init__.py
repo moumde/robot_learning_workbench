@@ -1,5 +1,16 @@
-"""Dataset writer contracts and explicitly selected backends."""
+"""Compatibility exports for core.workbench.recording.writers; implementation lives in the parent."""
 
-from .base import DatasetWriter, WriterCapabilities
+from importlib import import_module as _import_module
 
-__all__ = ["DatasetWriter", "WriterCapabilities"]
+_implementation = _import_module('core.workbench.recording.writers')
+__all__ = getattr(_implementation, "__all__", [
+    name for name in vars(_implementation) if not name.startswith("_")
+])
+
+
+def __getattr__(name):
+    return getattr(_implementation, name)
+
+
+def __dir__():
+    return sorted(set(globals()) | set(dir(_implementation)))

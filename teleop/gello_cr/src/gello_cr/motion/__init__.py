@@ -1,34 +1,16 @@
-"""Shared motion execution, target safety, and control ownership."""
+"""Compatibility exports for core.workbench.motion; implementation lives in the parent."""
 
-from .coordinator import MotionCoordinator, MotionLease
-from .executor import MotionExecutor
-from .safety import MotionSafety
-from .types import (
-    MOTION_PRIORITY,
-    JointTarget,
-    MotionBusyError,
-    MotionError,
-    MotionMode,
-    MotionPreempted,
-    MotionSafetyError,
-    MotionSource,
-    MotionStatus,
-    TcpTarget,
-)
+from importlib import import_module as _import_module
 
-__all__ = [
-    "MOTION_PRIORITY",
-    "JointTarget",
-    "MotionBusyError",
-    "MotionCoordinator",
-    "MotionError",
-    "MotionExecutor",
-    "MotionLease",
-    "MotionMode",
-    "MotionPreempted",
-    "MotionSafety",
-    "MotionSafetyError",
-    "MotionSource",
-    "MotionStatus",
-    "TcpTarget",
-]
+_implementation = _import_module('core.workbench.motion')
+__all__ = getattr(_implementation, "__all__", [
+    name for name in vars(_implementation) if not name.startswith("_")
+])
+
+
+def __getattr__(name):
+    return getattr(_implementation, name)
+
+
+def __dir__():
+    return sorted(set(globals()) | set(dir(_implementation)))

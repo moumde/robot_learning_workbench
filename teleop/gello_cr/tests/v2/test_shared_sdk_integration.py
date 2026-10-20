@@ -56,7 +56,7 @@ def test_config_runtime_and_camera_factory_accept_shared_hardware_values(tmp_pat
     lifecycle = Cr3aLifecycle(store=Store(paths.config_path), teleop_engine=None, paths=paths)
     assert tuple(lifecycle._robot_config().servoj_vmax) == (11, 12, 13, 14, 15, 16, 17)
     built = ConcreteRuntimeFactory(paths, constructors=constructors()).build()
-    camera_config = built.camera_devices["base"].args[0]
+    camera_config = built.camera_devices["base"].config
     assert (camera_config.width, camera_config.height, camera_config.fps) == (320, 240, 15)
 
 

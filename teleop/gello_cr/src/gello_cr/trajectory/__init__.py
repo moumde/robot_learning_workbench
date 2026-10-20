@@ -1,29 +1,16 @@
-"""Named trajectory recording, storage, adapters, and motion-controlled playback."""
+"""Compatibility exports for core.workbench.trajectory; implementation lives in the parent."""
 
-from .model import (
-    ReplayMode,
-    ReplayOptions,
-    Trajectory,
-    TrajectoryFrame,
-    TrajectoryMetadata,
-    make_trajectory,
-)
-from .player import TrajectoryPlayer
-from .recorder import TrajectoryRecorder, TrajectorySampleSource
-from .store import TrajectoryStore
-from .validation import preview_trajectory, validate_trajectory
+from importlib import import_module as _import_module
 
-__all__ = [
-    "ReplayMode",
-    "ReplayOptions",
-    "Trajectory",
-    "TrajectoryFrame",
-    "TrajectoryMetadata",
-    "TrajectoryPlayer",
-    "TrajectoryRecorder",
-    "TrajectorySampleSource",
-    "TrajectoryStore",
-    "make_trajectory",
-    "preview_trajectory",
-    "validate_trajectory",
-]
+_implementation = _import_module('core.workbench.trajectory')
+__all__ = getattr(_implementation, "__all__", [
+    name for name in vars(_implementation) if not name.startswith("_")
+])
+
+
+def __getattr__(name):
+    return getattr(_implementation, name)
+
+
+def __dir__():
+    return sorted(set(globals()) | set(dir(_implementation)))

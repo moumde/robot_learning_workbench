@@ -1,32 +1,16 @@
-"""UI-independent application orchestration."""
+"""Compatibility exports for core.workbench.app; implementation lives in the parent."""
 
-from .event_buffer import ApplicationEventBuffer
-from .events import AppEvent, EventLevel
-from .runtime_bindings import (
-    RuntimeCommandBindings,
-    RuntimeLifecycleCallbacks,
-)
-from .service import (
-    ApplicationService,
-    ApplicationSnapshot,
-    CommandResult,
-    CommandSuperseded,
-)
-from .view_model import (
-    ApplicationViewModel,
-    build_application_view_model,
-)
+from importlib import import_module as _import_module
 
-__all__ = [
-    "AppEvent",
-    "ApplicationEventBuffer",
-    "ApplicationService",
-    "ApplicationSnapshot",
-    "ApplicationViewModel",
-    "CommandResult",
-    "CommandSuperseded",
-    "EventLevel",
-    "RuntimeCommandBindings",
-    "RuntimeLifecycleCallbacks",
-    "build_application_view_model",
-]
+_implementation = _import_module('core.workbench.app')
+__all__ = getattr(_implementation, "__all__", [
+    name for name in vars(_implementation) if not name.startswith("_")
+])
+
+
+def __getattr__(name):
+    return getattr(_implementation, name)
+
+
+def __dir__():
+    return sorted(set(globals()) | set(dir(_implementation)))

@@ -1,36 +1,7 @@
-"""PySide6 operator UI; UI must not import vendor SDKs."""
-
-from .backend import (
-    OperatorBackend,
-    RuntimeFaultSnapshotBridge,
-)
-from .command_port import (
-    AsyncApplicationCommandPort,
-    CallbackCommandPort,
-    CommandPort,
-    CommandPortClosed,
-    CommandPortError,
-    CommandQueueFull,
-    CommandRequest,
-)
-from .presenter import OperatorUiPresenter, UiFrame
-from .preview_model import CameraPreview
-from .readiness import OperatorReadiness
-from .session import create_operator_window
-
-__all__ = [
-    "AsyncApplicationCommandPort",
-    "CallbackCommandPort",
-    "CameraPreview",
-    "CommandPort",
-    "CommandPortClosed",
-    "CommandPortError",
-    "CommandQueueFull",
-    "CommandRequest",
-    "OperatorBackend",
-    "OperatorReadiness",
-    "OperatorUiPresenter",
-    "RuntimeFaultSnapshotBridge",
-    "UiFrame",
-    "create_operator_window",
-]
+"""Compatibility package for the parent collection UI."""
+from importlib import import_module as _import_module
+_parent = _import_module('hmi.collection')
+__all__ = getattr(_parent, "__all__", [n for n in vars(_parent) if not n.startswith("_")])
+globals().update({n: getattr(_parent, n) for n in __all__})
+def __getattr__(name):
+    return getattr(_parent, name)
