@@ -1,30 +1,28 @@
 # GELLO 遥操模块
 
-此目录只维护 GELLO 主设备、关节/手部映射、运动学、标定和跟随策略。
-设备实现在 `devices/gello.py`，控制策略在 `control/`，由父工作台组合运行。
+日常安装和采集操作见 [遥操快速开始](../README.md)。所有命令从父项目根目录运行，
+安装由父 `pyproject.toml` 管理，应用使用 NRC Python 环境，LeRobot Writer 使用独立环境。
 
-```python
-from teleop.gello_cr.devices.gello import GelloDevice, GelloFeedback
-from teleop.gello_cr.control.controller import TeleopController
-```
+遥操实现按职责放在本目录的子文件夹中：
 
-从仓库根目录安装和启动：
+- `ui/`：采集窗口、页面、Presenter、Designer 表单和样式。
+- `app/`、`core/`：应用服务、命令、状态机、配置和权限。
+- `bootstrap/`：配置组合、设备注册和应用创建。
+- `devices/`、`hardware/`：GELLO 等主设备、CR3A、O6 和相机适配；SDK 复用父 `vendor/`。
+- `control/`、`motion/`：GELLO 标定与映射、跟随策略、运动仲裁和执行。
+- `trajectory/`、`recording/`：轨迹、规划、采集、Writer、恢复和数据发布。
+- `cli/`、`support/`：命令行入口、路径、日志、诊断和数据契约。
+- `tools/`、`examples/`、`tests/`：离线工具、窗口预览和模块测试。
+
+正式入口为 `python -m teleop.gello_cr.ui`，回放入口为
+`python -m teleop.gello_cr.cli.replay`，日常通过父启动脚本使用：
 
 ```bash
-./scripts/setup_teleop_env.sh
-./scripts/run_teleop.sh --check-only
 ./scripts/run_teleop.sh
 ./scripts/run_gello_replay.sh --help
 ```
 
-采集界面位于 `hmi/collection/`，共享运行时、轨迹和 Recorder 位于 `core/workbench/`，
-机器人、O6 和相机适配位于 `core/hardware/`。应用复用 `module/nrc/.venv/`；
-LeRobot Writer 使用父项目独立环境。运行配置由 `config/teleop/gello_cr.json` 和
-`config/hardware/*.toml` 提供，启动保持 OFFLINE / IDLE。
-
-安装、配置和设备边界见 [集成说明](../../docs/gello_cr_integration.md)及
-[父级框架](../../docs/parent_workbench_framework.md)。详细指南位于
-[docs/teleop](../../docs/teleop/architecture.md)，版本记录见
-[CHANGELOG](../../docs/teleop/CHANGELOG.md)。诊断、轨迹转换和离线窗口预览分别位于
-`tools/workbench_diagnostics.py`、`tools/migrate_legacy_trajectory.py` 和
-`examples/preview_collection.py`。
+配置、数据和日志仍共用父项目的 `config/`、`dataset/`、`logs/`。
+详细边界见 [父项目与模块](../../docs/parent_workbench_framework.md)，
+配置及环境见 [集成说明](../../docs/gello_cr_integration.md)，
+离线工具见 [示例](examples/README.md)，历史变更见 [CHANGELOG](../../docs/teleop/CHANGELOG.md)。

@@ -43,7 +43,7 @@ def workbench(tmp_path):
 
 
 def test_profile_overrides_physical_settings_and_preserves_calibration(workbench, monkeypatch):
-    from core.workbench.composition import IntegratedConfigStore
+    from teleop.gello_cr.bootstrap.composition import IntegratedConfigStore
 
     root, config, profile = workbench
     monkeypatch.chdir("/tmp")
@@ -85,7 +85,7 @@ def test_profile_overrides_physical_settings_and_preserves_calibration(workbench
     ("hardware.name", "unowned profile name"),
 ])
 def test_save_rejects_hardware_owned_edits(workbench, field, value):
-    from core.workbench.composition import IntegratedConfigStore
+    from teleop.gello_cr.bootstrap.composition import IntegratedConfigStore
 
     root, config, profile = workbench
     original = config.read_bytes()
@@ -101,7 +101,7 @@ def test_save_rejects_hardware_owned_edits(workbench, field, value):
 
 
 def test_save_keeps_json_portable_without_hardware_snapshots(workbench, monkeypatch):
-    from core.workbench.composition import IntegratedConfigStore
+    from teleop.gello_cr.bootstrap.composition import IntegratedConfigStore
 
     root, config, profile = workbench
     original_profile = profile.read_bytes()
@@ -138,7 +138,7 @@ def test_save_keeps_json_portable_without_hardware_snapshots(workbench, monkeypa
     ('joint_count = 6', 'joint_count = 7'),
 ])
 def test_rejects_hardware_profiles_the_o6_adapter_cannot_use(workbench, old, new):
-    from core.workbench.composition import IntegratedConfigStore
+    from teleop.gello_cr.bootstrap.composition import IntegratedConfigStore
 
     root, config, profile = workbench
     profile.write_text(profile.read_text().replace(old, new))
@@ -147,7 +147,7 @@ def test_rejects_hardware_profiles_the_o6_adapter_cannot_use(workbench, old, new
 
 
 def test_explicit_hardware_profile_is_relative_to_parent_root(workbench, monkeypatch):
-    from core.workbench.composition import IntegratedConfigStore
+    from teleop.gello_cr.bootstrap.composition import IntegratedConfigStore
 
     root, config, profile = workbench
     override = root / "config/hardware/other.toml"
@@ -161,9 +161,9 @@ def test_explicit_hardware_profile_is_relative_to_parent_root(workbench, monkeyp
 
 
 def test_save_makes_a_repo_local_hardware_reference_portable(workbench):
-    from core.workbench.app.settings import OperatorSettings
+    from teleop.gello_cr.app.settings import OperatorSettings
 
-    from core.workbench.composition import IntegratedConfigStore
+    from teleop.gello_cr.bootstrap.composition import IntegratedConfigStore
 
     root, config, profile = workbench
     data = json.loads(config.read_text())
@@ -178,10 +178,10 @@ def test_save_makes_a_repo_local_hardware_reference_portable(workbench):
 
 
 def test_factory_guards_each_robot_with_its_actual_profile_endpoint(workbench, monkeypatch):
-    from core.hardware.cr3a import Cr3aConfig
+    from teleop.gello_cr.hardware.cr3a import Cr3aConfig
 
     from core.hardware_session import RobotSessionBusyError
-    from core.workbench.composition import WorkbenchRuntimeFactory, workbench_paths
+    from teleop.gello_cr.bootstrap.composition import WorkbenchRuntimeFactory, workbench_paths
 
     root, config, profile = workbench
     factory = WorkbenchRuntimeFactory(workbench_paths(root))
@@ -204,8 +204,8 @@ def test_factory_guards_each_robot_with_its_actual_profile_endpoint(workbench, m
 
 
 def test_collection_ui_entry_uses_parent_profile(workbench, monkeypatch):
-    from core.workbench.bootstrap.runtime_factory import ConcreteRuntimeFactory
-    from hmi.collection.__main__ import main
+    from teleop.gello_cr.bootstrap.runtime_factory import ConcreteRuntimeFactory
+    from teleop.gello_cr.ui.__main__ import main
 
     root, config, profile = workbench
     built = []
@@ -225,9 +225,9 @@ def test_collection_ui_entry_uses_parent_profile(workbench, monkeypatch):
 
 
 def test_replay_entry_uses_parent_factory_only_for_execution(workbench, monkeypatch, capsys):
-    from core.workbench.bootstrap.runtime_factory import ConcreteRuntimeFactory, RuntimeFactoryPaths
-    from core.workbench import replay
-    from core.workbench.cli import replay_trajectory as cli
+    from teleop.gello_cr.bootstrap.runtime_factory import ConcreteRuntimeFactory, RuntimeFactoryPaths
+    from teleop.gello_cr.cli import replay
+    from teleop.gello_cr.cli import replay_trajectory as cli
 
     root, config, profile = workbench
     trajectory = root / "trajectory.json"
@@ -256,8 +256,8 @@ def test_replay_entry_uses_parent_factory_only_for_execution(workbench, monkeypa
 
 
 @pytest.mark.parametrize("module,arguments,expected", [
-    ("hmi.collection", ["--check-only"], "hardware_connections=not_started"),
-    ("core.workbench.replay", [], '"frame_count": 1'),
+    ("teleop.gello_cr.ui", ["--check-only"], "hardware_connections=not_started"),
+    ("teleop.gello_cr.cli.replay", [], '"frame_count": 1'),
 ])
 def test_parent_entries_run_from_an_unrelated_working_directory(
     tmp_path, module, arguments, expected,
@@ -266,7 +266,7 @@ def test_parent_entries_run_from_an_unrelated_working_directory(
     trajectory.write_text(json.dumps({
         "version": 3, "frames": [{"t": 0, "robot_joints_deg": [0] * 7}],
     }))
-    if module == "core.workbench.replay":
+    if module == "teleop.gello_cr.cli.replay":
         arguments = [str(trajectory), *arguments]
     env = {**os.environ, "PYTHONPATH": str(ROOT), "QT_QPA_PLATFORM": "offscreen"}
     result = subprocess.run(
@@ -279,7 +279,7 @@ def test_parent_entries_run_from_an_unrelated_working_directory(
 
 
 def test_left_hand_uses_shared_profile_address_and_cannot_persist_an_override(workbench):
-    from core.workbench.composition import IntegratedConfigStore
+    from teleop.gello_cr.bootstrap.composition import IntegratedConfigStore
 
     root, config, profile = workbench
     profile.write_text(profile.read_text().replace('side = "right"', 'side = "left"'))

@@ -6,12 +6,12 @@
 
 | 设备 | 代码与依赖 | 打开时机 |
 | --- | --- | --- |
-| CR3A / NRC | `core/hardware/cr3a.py` 生命周期、`core/hardware/nrc_robot.py` 会话；`vendor/nrc_interface/nrc_linux_x86_64/` 的 Python wrapper 与匹配原生扩展 | 明确“连接机器人”；连接后不使能 |
+| CR3A / NRC | `teleop/gello_cr/hardware/cr3a.py` 生命周期、`teleop/gello_cr/hardware/nrc_robot.py` 会话；`vendor/nrc_interface/nrc_linux_x86_64/` 的 Python wrapper 与匹配原生扩展 | 明确“连接机器人”；连接后不使能 |
 | GELLO | `teleop/gello_cr/devices/gello.py`；`vendor/gello`、`dynamixel-sdk`；FK 模式使用配置 URDF | 明确准备设备 |
-| O6 | `core/hardware/o6.py`；`vendor/actuator/linkerhand-python-sdk/LinkerHand/` 及 `pymodbus==3.5.1` | 明确准备设备；RS485 SDK 由唯一 `O6-RS485` 线程拥有 |
-| RealSense RGB | `core/hardware/realsense.py`、`pyrealsense2` | 明确启动相机；每个唯一序列号一个物理流 |
-| RoArm（可选主臂） | `teleop/devices/roarm.py`，串口通信 | `master.type=roarm` 并明确准备 |
-| Inverse3（可选主臂） | `teleop/devices/inverse3.py`，外部 Inverse Service、`websocket-client`（`alternative-masters` extra） | `master.type=inverse3` 并明确准备 |
+| O6 | `teleop/gello_cr/hardware/o6.py`；`vendor/actuator/linkerhand-python-sdk/LinkerHand/` 及 `pymodbus==3.5.1` | 明确准备设备；RS485 SDK 由唯一 `O6-RS485` 线程拥有 |
+| RealSense RGB | `teleop/gello_cr/hardware/realsense.py`、`pyrealsense2` | 明确启动相机；每个唯一序列号一个物理流 |
+| RoArm（可选主臂） | `teleop/gello_cr/devices/roarm.py`，串口通信 | `master.type=roarm` 并明确准备 |
+| Inverse3（可选主臂） | `teleop/gello_cr/devices/inverse3.py`，外部 Inverse Service、`websocket-client`（`alternative-masters` extra） | `master.type=inverse3` 并明确准备 |
 
 应用以 Linux x86-64 / Python 3.12 为仓库 NRC 原生扩展部署基线；不要混用其他 Python ABI 的 `_nrc_host`。保持 SDK wrapper 与扩展成对，组合入口固定使用父 `vendor/nrc_interface/nrc_linux_x86_64/`。父 `run_nrc.sh` 为选中解释器添加库路径。GELLO 和 LinkerHand 的代码从父 `vendor/` 定位；从仓库根目录安装并只读检查配置：
 
@@ -39,7 +39,7 @@ STOP、软件急停、主臂丢失、机器人断连、相机过期、O6 故障�
 只读软件身份诊断：
 
 ```bash
-./scripts/run_nrc.sh python tools/workbench_diagnostics.py
+./scripts/run_nrc.sh python teleop/gello_cr/tools/workbench_diagnostics.py
 ```
 
 该命令不加载 SDK、不连接设备，`connected_devices={}` 不能作为连接或运动验收证据。现场需记录控制器/固件、SDK 版本、物理急停结果和性能实测值，并确认停止、断连恢复及退出行为符合实际设备要求。

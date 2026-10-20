@@ -26,7 +26,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from core.workbench.core.contracts import JointState, MasterSnapshot
+from teleop.gello_cr.core.contracts import JointState, MasterSnapshot
 
 RobotFactory = Callable[..., Any]
 

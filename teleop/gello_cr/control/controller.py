@@ -15,8 +15,8 @@ from typing import Any
 
 import numpy as np
 
-from core.workbench.control.contracts import TeleopHooks
-from core.workbench.control.geometry import (
+from teleop.gello_cr.control.contracts import TeleopHooks
+from teleop.gello_cr.control.geometry import (
     _nrc_abc_to_quaternion,
     _quaternion_distance,
     _quaternion_inverse,
@@ -27,15 +27,15 @@ from core.workbench.control.geometry import (
     _rotation_matrix_to_quaternion,
     _wrapped_angle_delta,
 )
-from core.workbench.errors import TeleopError
-from core.workbench.motion import (
+from teleop.gello_cr.devices.gello import GelloFeedback
+from teleop.gello_cr.motion import (
     JointTarget,
     MotionCoordinator,
     MotionLease,
     MotionPreempted,
     MotionSource,
 )
-from teleop.gello_cr.devices.gello import GelloFeedback
+from teleop.gello_cr.support.errors import TeleopError
 
 from .hand_mapping import binary_o6_action, interpolate_o6_target, should_send_o6_target
 from .joint_mapping import RelativeJointMapper

@@ -24,8 +24,9 @@ import math
 import threading
 import time
 from collections.abc import Iterable, Sequence
-from core.hardware.servo_state import ServoTransition
 from typing import Any
+
+from teleop.gello_cr.hardware.servo_state import ServoTransition
 
 _nrc = None
 

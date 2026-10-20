@@ -289,7 +289,7 @@ uv pip install --python module/nrc/.venv/bin/python \
 
 ### 3.7 GELLO 遥操与数据采集
 
-采集 UI 位于 `hmi/collection`，共享状态机/运行时/Recorder 位于 `core/workbench`，设备管理位于 `core/hardware`；GELLO 目录保留具体主设备与控制策略。参见 [父级框架说明](docs/parent_workbench_framework.md)。
+遥操界面、控制、设备适配和采集实现统一放在 `teleop/gello_cr/` 的职责子目录，SDK 复用父 `vendor/`。日常操作先看 [遥操快速开始](teleop/README.md)，源码边界见 [模块与父项目](docs/parent_workbench_framework.md)。
 
 安装父 NRC 环境中的界面/硬件依赖及独立 V2.1 Writer，再执行只读配置检查：
 
@@ -306,8 +306,8 @@ uv pip install --python module/nrc/.venv/bin/python \
 `dataset/staging/`、`dataset/replay/trajectories/`。
 独立轨迹 CLI 默认预览，真实回放需显式 `--execute`；父 HMI 提供采集入口和共享轨迹任务。
 完整安装、配置、预览和工作流格式见 [集成说明](docs/gello_cr_integration.md)，详细维护指南见
-[docs/teleop](docs/teleop/architecture.md)。无硬件窗口示例为 `examples/preview_collection.py`，
-诊断工具为 `tools/workbench_diagnostics.py`，使用父 NRC 环境运行。真机联调尚未完成。
+[docs/teleop](docs/teleop/architecture.md)。运行和失败日志自动写入父 `logs/teleop.log`。无硬件窗口示例为 `teleop/gello_cr/examples/preview_collection.py`，
+诊断工具为 `teleop/gello_cr/tools/workbench_diagnostics.py`，使用父 NRC 环境运行。真机联调尚未完成。
 
 ## 4. 硬件测试
 
@@ -391,8 +391,8 @@ vendor/actuator/linkerhand-python-sdk/requirements.txt
 robot_learning_workbench/
 ├── vendor/                 # NRC、相机、末端执行器等硬件适配
 ├── config/                 # 运行时硬件配置和配置中间层
-├── teleop/gello_cr/        # GELLO 主设备、映射和跟随策略
-├── hmi/                    # 采集控制台与部署任务界面
+├── teleop/gello_cr/         # 遥操 UI、控制、设备适配、采集、工具和测试
+├── hmi/                    # 部署任务界面
 ├── module/
 │   ├── openpi/             # OpenPI 源码，由本项目直接管理
 │   │   └── src/openpi/policies/
@@ -409,8 +409,6 @@ robot_learning_workbench/
 ├── checkpoints/            # 模型权重，不进 Git
 ├── thirdparty/             # 确实需要 vendoring 的第三方代码
 ├── scripts/                # 部署、环境、验证和启动脚本
-├── tools/                  # 离线诊断、轨迹迁移与采集仿真
-├── examples/               # 无硬件窗口预览
 ├── docs/teleop/            # 遥操架构、配置、数据、硬件和迁移指南
 └── logs/                   # 本地运行日志，不进 Git
 ```
