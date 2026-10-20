@@ -13,7 +13,7 @@ from hmi.deploy import app as hmi
 
 # isort: split
 
-from gello_cr.trajectory import TrajectoryFrame, TrajectoryStore, make_trajectory
+from core.workbench.trajectory import TrajectoryFrame, TrajectoryStore, make_trajectory
 
 
 @pytest.fixture(scope="module")

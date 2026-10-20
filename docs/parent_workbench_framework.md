@@ -7,7 +7,7 @@
 - `core/workbench/motion/`、`trajectory/`、`recording/`：运动仲裁、轨迹/规划、采集、writer、恢复和合并。
 - `core/workbench/bootstrap/`、`composition.py`：父级组合入口与硬件配置。
 - `core/hardware/`：机器人适配、O6 单线程通信、相机管理与原生 RGB 采样后端。
-- `teleop/gello_cr/`：GELLO 反馈、映射、校准和跟随策略；旧 `gello_cr` 导入暂保留兼容层。
+- `teleop/gello_cr/devices/`、`control/`：GELLO 反馈、映射、校准、运动学和跟随策略。
 
 ## 运行
 
@@ -20,7 +20,13 @@
 module/nrc/.venv/bin/python scripts/generate_collection_ui.py
 ```
 
-正式 Python 入口为 `python -m hmi.collection`。旧 `python -m teleop.gello_cr` 与 `gello_cr.ui` 命令转到同一父实现；没有第二份窗口、状态机或 Recorder。嵌套打包配置已迁到父级。
+正式 Python 入口为 `python -m hmi.collection`，回放入口为 `python -m core.workbench.replay`。代码直接使用父命名空间和 `teleop.gello_cr.control.*`、`teleop.gello_cr.devices.gello`；独立兼容包与嵌套启动脚本已移除，安装由父 `pyproject.toml` 管理。
+
+诊断工具为 `./scripts/run_nrc.sh python tools/workbench_diagnostics.py`，只读数据校验为
+`./scripts/run_nrc.sh python -m core.workbench.recording.validate_dataset --help`。
+[无硬件窗口预览](../examples/README.md)、[详细架构](teleop/architecture.md)、
+[配置](teleop/configuration.md)、[数据集](teleop/dataset.md)、[硬件](teleop/hardware.md)和
+[迁移](teleop/migration_v1.md)均从父目录维护。
 
 ## 设备所有权
 

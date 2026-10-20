@@ -42,4 +42,11 @@
 module/nrc/.venv/bin/python scripts/generate_collection_ui.py
 ```
 
-共享状态机、运行时和 Recorder 位于 `core/workbench`，设备管理位于 `core/hardware`；共享架构见 [父级框架](../docs/parent_workbench_framework.md)。
+共享状态机、运行时和 Recorder 位于 `core/workbench`，设备管理位于 `core/hardware`；共享架构见
+[父级框架](../docs/parent_workbench_framework.md) 和 [详细指南](../docs/teleop/architecture.md)。
+
+无硬件窗口预览使用 NRC 环境运行：
+
+```bash
+./scripts/run_nrc.sh python examples/preview_collection.py
+```

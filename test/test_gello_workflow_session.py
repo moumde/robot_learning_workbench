@@ -10,7 +10,7 @@ from core.openpi.cr3_o6 import run_workflow as workflow
 
 # isort: split
 
-from gello_cr.trajectory import TrajectoryFrame, TrajectoryStore, make_trajectory
+from core.workbench.trajectory import TrajectoryFrame, TrajectoryStore, make_trajectory
 
 
 class WorkflowRobot:

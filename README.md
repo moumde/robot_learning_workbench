@@ -59,7 +59,9 @@ Ubuntu 上首次部署：
 
 独立轨迹 CLI 入口为 `scripts/run_gello_replay.sh`，默认预览，真实回放需显式 `--execute`；
 部署界面提供采集入口和共享轨迹任务。安装和运行脚本支持 `--help`。
-完整安装、可选 V3 Writer、配置、预览和工作流格式见 [GELLO 集成说明](docs/gello_cr_integration.md)。真机联调尚未完成。
+完整安装、可选 V3 Writer、配置、预览和工作流格式见 [GELLO 集成说明](docs/gello_cr_integration.md)，详细维护指南见
+[docs/teleop](docs/teleop/architecture.md)。无硬件窗口示例为 `examples/preview_collection.py`，
+诊断工具为 `tools/workbench_diagnostics.py`，使用父 NRC 环境运行。真机联调尚未完成。
 
 ## 命令行常用操作
 
@@ -97,6 +99,9 @@ dataset/              本地训练、恢复批次和回放数据（不提交）
 checkpoints/          模型检查点（不提交）
 tasks/                可保存的任务流配置
 scripts/              环境、验证和启动脚本
+tools/                离线诊断、轨迹迁移与采集仿真
+examples/             无硬件窗口预览
+docs/teleop/          遥操架构、配置、数据、硬件和迁移指南
 ```
 
 硬件参数集中在 `config/hardware/`，读取和校验入口是 `config/hardware.py`。新增机器人配置时复制对应 profile，避免在业务代码中散落 IP、端口和设备序列号。

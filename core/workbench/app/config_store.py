@@ -243,7 +243,7 @@ class TeleopConfigStore:
         if not path.is_file():
             raise FileNotFoundError(
                 f"Workbench config missing: {path}. Copy your calibrated configuration "
-                "to config/workbench.json; see docs/migration_v1.md."
+                f"to {path}; see docs/gello_cr_integration.md."
             )
         return cls(path)
 

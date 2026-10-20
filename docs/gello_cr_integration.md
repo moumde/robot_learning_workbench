@@ -3,7 +3,8 @@
 父项目正式入口是 `scripts/run_teleop.sh`，运行 `python -m hmi.collection`。
 启动界面处于 OFFLINE / IDLE；连接机器人、使能、启动跟随、相机和采集均需人工操作。
 `--check-only` 仅加载并校验配置，不连接设备。GELLO 模块源代码位于
-`teleop/gello_cr/`，该目录原有说明保留了独立部署的背景；父项目部署以本文为准。
+`teleop/gello_cr/devices/` 和 `teleop/gello_cr/control/`；共享实现由父 `core/workbench/`、
+`core/hardware/` 和 `hmi/collection/` 直接维护。详细指南位于 [docs/teleop](teleop/architecture.md)。
 
 ## 配置与共享 SDK
 
@@ -81,14 +82,23 @@ NRC、V2.1 与 HDF5 环境由上述脚本安装；V3 安装需显式选择源码
 命名轨迹写入 `dataset/replay/trajectories/<uuid>/`。这些目录的生成物均不提交 Git。
 训练数据发布前在临时目录校验，成功后原子发布且不覆盖已有目录。
 中断恢复先人工处理 Partial，再创建新 Segment；原 Segment、journal 和失败信息保留。
-恢复不会自动连接设备、开始采样或恢复运动。详细操作见模块的
-[数据格式与恢复说明](../teleop/gello_cr/docs/dataset.md)。
+恢复不会自动连接设备、开始采样或恢复运动。详细操作见
+[数据格式与恢复说明](teleop/dataset.md)。只读 CLI 校验使用
+`./scripts/run_nrc.sh python -m core.workbench.recording.validate_dataset --help`。
 
 默认日志输出到终端，需要文件时写入父项目 `logs/`，例如在仓库根目录执行：
 
 ```bash
 ./scripts/run_teleop.sh > logs/gello_cr.log 2>&1
 ```
+
+## 诊断与离线工具
+
+从仓库根目录执行 `./scripts/run_nrc.sh python tools/workbench_diagnostics.py`，
+打印解释器、版本、配置和解析后的数据目录，不构造设备会话。
+无硬件窗口预览为 `./scripts/run_nrc.sh python examples/preview_collection.py`。
+历史 JSON 的一次性转换使用 `tools/migrate_legacy_trajectory.py`，见
+[迁移说明](teleop/migration_v1.md)；源轨迹保持只读。
 
 ## 轨迹预览与人工执行
 

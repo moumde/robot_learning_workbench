@@ -104,7 +104,7 @@ def _validate_plan(plan: Any) -> list[dict[str, Any]]:
                 if type(task.get("hand_enabled", False)) is not bool:
                     raise ValueError(f"Shared trajectory task {index} hand_enabled must be boolean")
                 # Use the same bounded options as the GELLO Player.
-                from gello_cr.trajectory.validation import validate_options
+                from core.workbench.trajectory.validation import validate_options
 
                 validate_options(_shared_options(task))
         elif kind == "ptp":
