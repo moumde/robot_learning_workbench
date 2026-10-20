@@ -45,3 +45,13 @@ logs/*
 *.egg-info/
 .pytest_cache/
 .ruff_cache/
+
+# Local development plans, audits and validation records
+/docs/superpowers/
+/docs/gello_integration_plan.md
+/docs/gello_integration_validation.md
+/teleop/gello_cr/docs/superpowers/
+/teleop/gello_cr/docs/legacy_audit.md
+/teleop/gello_cr/docs/release_v1.md
+/teleop/gello_cr/docs/stability_review.md
+/teleop/gello_cr/docs/ui_ux_architecture_audit.md

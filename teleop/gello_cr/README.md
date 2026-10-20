@@ -13,7 +13,7 @@
 Joint / TCP / Waypoint 规划，以及 LeRobot V2.1、V3、HDF5 数据采集和中断恢复。
 
 正式 HMI 入口只有 **`scripts/run_operator.sh`**。启动为 OFFLINE / IDLE，不自动连接、使能、
-跟随或恢复运动。v1.0 代码与离线验证记录见 [发布清单](docs/release_v1.md)；现场验收尚未签收。
+跟随或恢复运动。真实设备部署与现场核对见 [硬件说明](docs/hardware.md)。
 
 ## 安装与配置
 
@@ -110,7 +110,6 @@ TCP 规划需要实际运动学服务；当前 NRC IK 只有单解，不能保�
 ## 架构与目录
 
 从 [架构说明](docs/architecture.md) 了解依赖边界、权威状态和线程归属。
-本次 UI 改造的依据见 [UI/UX 架构审计](docs/ui_ux_architecture_audit.md)。
 
 ```text
 父 hmi/collection/        Qt UI、Designer 表单和 QSS
@@ -122,7 +121,7 @@ teleop/gello_cr/           GELLO 设备、映射和跟随策略
 src/gello_cr/              过渡兼容导入；无重复实现
 ```
 
-原始代码的处理决定见 [Legacy Audit](docs/legacy_audit.md)，版本变化见 [CHANGELOG](CHANGELOG.md)。
+版本变化见 [CHANGELOG](CHANGELOG.md)。
 可选 DAgger 集成仍使用外部 OpenPI 项目，设置 `GELLO_CR_OPENPI_ROOT` 后在高级区域显式启动；
 模型接口须在部署环境联调，核心工作台不依赖 OpenPI。
 
@@ -142,7 +141,7 @@ git diff --check
 ```
 
 默认测试禁止真实 SDK 和设备打开；真实设备测试必须显式标记 `hardware` 并单独选择
-`pytest -m hardware`。当前真机发布流程使用 [人工验收清单](docs/release_v1.md)，不在 CI 中驱动硬件。
+`pytest -m hardware`。现场部署和设备核对见 [硬件说明](docs/hardware.md)，CI 不驱动硬件。
 完整官方格式回归需另设 `GELLO_TEST_V21_PYTHON` 和 `GELLO_TEST_V3_PYTHON`。
 未提供时这些测试会说明原因并跳过，其他离线功能照常运行。
 CI 只运行离线检查；没有文件哈希比对或额外冒烟测试框架。

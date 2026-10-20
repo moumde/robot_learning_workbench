@@ -46,8 +46,3 @@ module/nrc/.venv/bin/python tools/simulate_collection.py --duration 300 \
 ```
 
 仿真工具走父 `WorkbenchRuntimeFactory`、父 Robot/Camera、真实 Qt 状态更新与 writer。仅替换硬件信号并写隔离测试目录，不连接真实设备。报告记录 FPS、相机帧复用/采样延迟、GUI 心跳、异常与退出线程；相机硬件丢帧数未统计时保持 unknown。
-
-
-2026-10-19 验证：完整离线回归 991 通过；父级组合持续录制 300 秒、6,003 帧、约 19.995 FPS，
-并完成设备故障恢复、三格式保存读回和退出清理。详细证据与范围见
-[gello_integration_validation.md](gello_integration_validation.md#2026-10-19共享框架归入父项目并复用父-robot--camera)。
