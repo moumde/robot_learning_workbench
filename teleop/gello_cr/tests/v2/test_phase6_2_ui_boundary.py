@@ -4,7 +4,7 @@ from __future__ import annotations
 import ast
 from pathlib import Path
 
-UI_ROOT = Path(__file__).resolve().parents[2] / "src/gello_cr/ui"
+UI_ROOT = Path(__file__).resolve().parents[4] / "hmi/collection"
 
 
 def _method_source(filename: str, method_name: str) -> str:

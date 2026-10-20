@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from tests.fakes.paths import implementation_path
 
 from gello_cr.bootstrap.runtime_factory import (
     ConcreteRuntimeFactory,
@@ -121,14 +122,12 @@ def test_factory_builds_gello_runtime_without_connecting_hardware(tmp_path) -> N
     assert runtime.teleop_engine.attached == []
     assert runtime.cr3a_lifecycle.device is None
     assert runtime.cr3a_lifecycle.session is None
-    assert runtime.camera_devices["wrist"].args
-    assert runtime.camera_devices["base"].args
+    assert runtime.camera_devices["wrist"].config.serial == "wrist"
+    assert runtime.camera_devices["base"].config.serial == "base"
 
 
 def test_factory_does_not_call_connect_power_or_start_by_source() -> None:
-    source = Path(
-        'src/gello_cr/bootstrap/runtime_factory.py'
-    ).read_text(encoding='utf-8')
+    source = implementation_path('src/gello_cr/bootstrap/runtime_factory.py').read_text(encoding='utf-8')
     build = source.split('    def build(self) -> ConcreteRuntime:', 1)[1]
     build = build.split('\n        return ConcreteRuntime(', 1)[0]
 

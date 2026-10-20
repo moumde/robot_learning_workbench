@@ -45,7 +45,7 @@ fi
 # Resolve the parent client in the same transaction so its NumPy <2 ABI is kept.
 uv pip install --python "$TELEOP_PYTHON" \
   -e "$ROOT/module/openpi/packages/openpi-client" \
-  -e "$ROOT/teleop/gello_cr[ui,hdf5,data-validation]" \
+  -e "$ROOT[ui,hdf5,data-validation]" \
   'numpy>=1.26,<2' \
   'opencv-python>=4.8,<4.12' \
   'pyarrow>=21,<22' \

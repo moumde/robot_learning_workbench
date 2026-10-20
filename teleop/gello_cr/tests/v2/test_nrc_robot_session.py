@@ -387,11 +387,9 @@ def test_servoj_open_send_and_stop_use_servo_port() -> None:
         and len(call[2]) == 7
         for call in api.calls
     )
-    assert (
-        "set_servoJ_pos",
-        22,
-        (1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 0.0),
-    ) in api.calls
+    sent = next(call for call in api.calls if call[0] == "set_servoJ_pos")
+    assert sent[1] == 22
+    assert sent[2] == pytest.approx((1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 0.0))
     assert ("stop_servoJ", 22) in api.calls
 
 

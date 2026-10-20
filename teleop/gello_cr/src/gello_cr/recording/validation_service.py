@@ -1,16 +1,8 @@
-"""Read-only format validation in the configured data Python environment."""
+"""Compatibility alias for core.workbench.recording.validation_service; no duplicated implementation."""
 
-from pathlib import Path
+import sys as _sys
+from importlib import import_module as _import_module
 
-from .worker_client import WorkerClient
+_implementation = _import_module('core.workbench.recording.validation_service')
 
-
-def validate_in_worker(format_name, root, writer_factory):
-    python = writer_factory.worker_pythons.get(format_name, writer_factory.config.worker_python)
-    client = WorkerClient(python, Path(__file__).with_name("worker.py"))
-    try:
-        return client.request(
-            {"op": "validate", "format": format_name, "root": str(root)}, timeout=180.0
-        )["validation"]
-    finally:
-        client.close()
+_sys.modules[__name__] = _implementation

@@ -1,7 +1,8 @@
-from .base import JournalDatasetMerger
+"""Compatibility alias for core.workbench.recording.mergers.lerobot_v3; no duplicated implementation."""
 
+import sys as _sys
+from importlib import import_module as _import_module
 
-class LeRobotV3Merger(JournalDatasetMerger):
-    """Rebuild V3 tables, video intervals and metadata through the official SDK."""
+_implementation = _import_module('core.workbench.recording.mergers.lerobot_v3')
 
-    format_name = "lerobot_v3"
+_sys.modules[__name__] = _implementation

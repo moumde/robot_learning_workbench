@@ -52,7 +52,7 @@ def test_collection_root_uses_config_directory_from_another_cwd(tmp_path, monkey
 
     monkeypatch.setattr(app, "exec", interact)
     try:
-        assert entrypoint.main(["--repo-root", str(tmp_path)]) == 0
+        assert entrypoint.main(["--repo-root", str(tmp_path)], application_factory=lambda root: operator) == 0
     finally:
         app.aboutToQuit.disconnect(operator.close)
         window.close()

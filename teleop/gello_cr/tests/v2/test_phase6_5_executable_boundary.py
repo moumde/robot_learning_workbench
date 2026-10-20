@@ -2,12 +2,13 @@
 from __future__ import annotations
 
 from pathlib import Path
+from tests.fakes.paths import implementation_path
 
 ROOT = Path(__file__).resolve().parents[2]
 
 
 def _source(path: str) -> str:
-    return (ROOT / path).read_text(encoding="utf-8")
+    return implementation_path(path).read_text(encoding="utf-8")
 
 
 def test_new_module_entry_exists_and_has_check_only_mode() -> None:

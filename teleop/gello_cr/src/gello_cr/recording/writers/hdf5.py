@@ -1,9 +1,8 @@
-"""HDF5 writer client; h5py and disk I/O stay in the worker."""
+"""Compatibility alias for core.workbench.recording.writers.hdf5; no duplicated implementation."""
 
-from .base import WriterCapabilities
-from .worker_writer import WorkerDatasetWriter
+import sys as _sys
+from importlib import import_module as _import_module
 
+_implementation = _import_module('core.workbench.recording.writers.hdf5')
 
-class HDF5Writer(WorkerDatasetWriter):
-    format_name = "hdf5"
-    capabilities = WriterCapabilities(False, True, True, True)
+_sys.modules[__name__] = _implementation

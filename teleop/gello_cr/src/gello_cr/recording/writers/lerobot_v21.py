@@ -1,9 +1,8 @@
-"""LeRobot V2.1 writer; the worker must use the official v0.3.3 SDK."""
+"""Compatibility alias for core.workbench.recording.writers.lerobot_v21; no duplicated implementation."""
 
-from .base import WriterCapabilities
-from .worker_writer import WorkerDatasetWriter
+import sys as _sys
+from importlib import import_module as _import_module
 
+_implementation = _import_module('core.workbench.recording.writers.lerobot_v21')
 
-class LeRobotV21Writer(WorkerDatasetWriter):
-    format_name = "lerobot_v21"
-    capabilities = WriterCapabilities(True, False, True, True)
+_sys.modules[__name__] = _implementation

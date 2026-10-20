@@ -1,7 +1,8 @@
-from .base import JournalDatasetMerger
+"""Compatibility alias for core.workbench.recording.mergers.hdf5; no duplicated implementation."""
 
+import sys as _sys
+from importlib import import_module as _import_module
 
-class HDF5Merger(JournalDatasetMerger):
-    """Write a fresh HDF5 file from retained episodes, including raw RGB arrays."""
+_implementation = _import_module('core.workbench.recording.mergers.hdf5')
 
-    format_name = "hdf5"
+_sys.modules[__name__] = _implementation

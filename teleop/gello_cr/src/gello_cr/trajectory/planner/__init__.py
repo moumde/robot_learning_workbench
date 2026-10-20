@@ -1,33 +1,16 @@
-"""Robot-independent motion planning into the common Trajectory model."""
+"""Compatibility exports for core.workbench.trajectory.planner; implementation lives in the parent."""
 
-from .planner import TrajectoryPlanner
-from .types import (
-    JointMoveRequest,
-    KinematicsProvider,
-    PlannerSettings,
-    PlanningError,
-    PlanningMetrics,
-    PlanningResult,
-    RobotModel,
-    TcpMoveRequest,
-    TcpPlanningMode,
-    TcpPose,
-    Waypoint,
-    WaypointRequest,
-)
+from importlib import import_module as _import_module
 
-__all__ = [
-    "KinematicsProvider",
-    "JointMoveRequest",
-    "PlannerSettings",
-    "PlanningError",
-    "PlanningMetrics",
-    "PlanningResult",
-    "RobotModel",
-    "TcpMoveRequest",
-    "TcpPlanningMode",
-    "TcpPose",
-    "TrajectoryPlanner",
-    "Waypoint",
-    "WaypointRequest",
-]
+_implementation = _import_module('core.workbench.trajectory.planner')
+__all__ = getattr(_implementation, "__all__", [
+    name for name in vars(_implementation) if not name.startswith("_")
+])
+
+
+def __getattr__(name):
+    return getattr(_implementation, name)
+
+
+def __dir__():
+    return sorted(set(globals()) | set(dir(_implementation)))

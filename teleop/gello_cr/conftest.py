@@ -1,6 +1,6 @@
 """All automated tests are offline: block hardware SDKs and device opens."""
-import os
 import importlib.abc
+import os
 import socket
 import sys
 

@@ -1,10 +1,11 @@
 from pathlib import Path
+from tests.fakes.paths import implementation_path
 
 ROOT = Path(__file__).resolve().parents[2]
 
 
 def _source(path):
-    return (ROOT / path).read_text(encoding="utf-8")
+    return implementation_path(path).read_text(encoding="utf-8")
 
 
 def test_main_window_never_calls_camera_or_runtime_objects() -> None:

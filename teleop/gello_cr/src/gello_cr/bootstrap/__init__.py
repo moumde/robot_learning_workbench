@@ -1,38 +1,16 @@
-"""Runtime construction boundaries for the staged V2 migration."""
+"""Compatibility exports for core.workbench.bootstrap; implementation lives in the parent."""
 
-from gello_cr.recording.source import CR3O6CaptureSource
+from importlib import import_module as _import_module
 
-from .camera_service import (
-    CameraPollingService,
-    CameraServiceSnapshot,
-)
-from .operator_app import (
-    OperatorApplication,
-    build_operator_application,
-)
-from .preparation import (
-    OperatorPreparationBindings,
-    OperatorReadinessProvider,
-)
-from .runtime_factory import (
-    ConcreteRuntime,
-    ConcreteRuntimeFactory,
-    Cr3aLifecycle,
-    RuntimeConstructors,
-    RuntimeFactoryPaths,
-)
+_implementation = _import_module('core.workbench.bootstrap')
+__all__ = getattr(_implementation, "__all__", [
+    name for name in vars(_implementation) if not name.startswith("_")
+])
 
-__all__ = [
-    "CameraPollingService",
-    "CameraServiceSnapshot",
-    "ConcreteRuntime",
-    "ConcreteRuntimeFactory",
-    "Cr3aLifecycle",
-    "OperatorApplication",
-    "OperatorPreparationBindings",
-    "OperatorReadinessProvider",
-    "CR3O6CaptureSource",
-    "RuntimeConstructors",
-    "RuntimeFactoryPaths",
-    "build_operator_application",
-]
+
+def __getattr__(name):
+    return getattr(_implementation, name)
+
+
+def __dir__():
+    return sorted(set(globals()) | set(dir(_implementation)))

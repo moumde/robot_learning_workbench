@@ -1,25 +1,11 @@
-"""Dataset worker entry point for the dedicated recording Python environment."""
+"""Compatibility alias for core.workbench.recording.worker; no duplicated implementation."""
 
-from __future__ import annotations
+import sys as _sys
+from importlib import import_module as _import_module
 
-import argparse
-import sys
-from pathlib import Path
-
-# The recording environment need not install the operator package. Direct
-# execution locates the same package tree as the parent recorder process.
-if __package__ in (None, ""):
-    sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
-
-from gello_cr.recording.worker_loop import run_worker
-
-
-def main() -> int:
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--worker-fd", type=int, required=True)
-    args = parser.parse_args()
-    return run_worker(args.worker_fd)
-
+_implementation = _import_module('core.workbench.recording.worker')
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    raise SystemExit(_implementation.main())
+
+_sys.modules[__name__] = _implementation

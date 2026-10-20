@@ -289,6 +289,8 @@ uv pip install --python module/nrc/.venv/bin/python \
 
 ### 3.7 GELLO 遥操与数据采集
 
+采集 UI 位于 `hmi/collection`，共享状态机/运行时/Recorder 位于 `core/workbench`，设备管理位于 `core/hardware`；GELLO 目录保留具体主设备与控制策略。参见 [父级框架说明](docs/parent_workbench_framework.md)。
+
 安装父 NRC 环境中的界面/硬件依赖及独立 V2.1 Writer，再执行只读配置检查：
 
 ```bash
@@ -387,8 +389,8 @@ vendor/actuator/linkerhand-python-sdk/requirements.txt
 robot_learning_workbench/
 ├── vendor/                 # NRC、相机、末端执行器等硬件适配
 ├── config/                 # 运行时硬件配置和配置中间层
-├── teleop/gello_cr/        # GELLO 遥操、采集和共享轨迹
-├── hmi/                    # 数据采集、训练和部署界面
+├── teleop/gello_cr/        # GELLO 主设备、映射和跟随策略
+├── hmi/                    # 采集控制台与部署任务界面
 ├── module/
 │   ├── openpi/             # OpenPI 源码，由本项目直接管理
 │   │   └── src/openpi/policies/
