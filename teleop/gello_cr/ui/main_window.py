@@ -114,6 +114,9 @@ class OperatorMainWindow(QMainWindow):
         self.collection.manage_datasets.connect(
             lambda: self.navigation.setCurrentRow(WorkbenchPage.DATASETS)
         )
+        self.robot_page.connection_requested.connect(
+            lambda: self.navigation.setCurrentRow(WorkbenchPage.COLLECTION)
+        )
         self.log_toggle.toggled.connect(self.event_log.setVisible)
         self.log_toggle.toggled.connect(
             lambda expanded: self.log_toggle.setText("运行日志  ▴" if expanded else "运行日志  ▾")

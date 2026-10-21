@@ -6,50 +6,1210 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>640</width>
-    <height>480</height>
+    <width>966</width>
+    <height>511</height>
    </rect>
   </property>
   <property name="sizePolicy">
-   <sizepolicy hsizetype="Preferred" vsizetype="Preferred">
+   <sizepolicy hsizetype="Expanding" vsizetype="Ignored">
     <horstretch>0</horstretch>
     <verstretch>0</verstretch>
    </sizepolicy>
   </property>
-  <layout class="QVBoxLayout" name="robot_VBoxLayout_1" stretch="0,0">
+  <layout class="QVBoxLayout" name="robot_page_layout" stretch="1,0">
    <property name="leftMargin">
-    <number>11</number>
+    <number>0</number>
    </property>
    <property name="topMargin">
-    <number>11</number>
+    <number>0</number>
    </property>
    <property name="rightMargin">
-    <number>11</number>
+    <number>0</number>
    </property>
    <property name="bottomMargin">
-    <number>11</number>
+    <number>0</number>
    </property>
    <property name="spacing">
-    <number>6</number>
+    <number>8</number>
    </property>
    <item>
-    <widget class="QPlainTextEdit" name="robot_details">
+    <widget class="QScrollArea" name="robot_content_scroll">
      <property name="sizePolicy">
       <sizepolicy hsizetype="Expanding" vsizetype="Expanding">
        <horstretch>0</horstretch>
        <verstretch>0</verstretch>
       </sizepolicy>
      </property>
-     <property name="readOnly">
+     <property name="frameShape">
+      <enum>QFrame::NoFrame</enum>
+     </property>
+     <property name="horizontalScrollBarPolicy">
+      <enum>Qt::ScrollBarAlwaysOff</enum>
+     </property>
+     <property name="widgetResizable">
       <bool>true</bool>
      </property>
-     <property name="placeholderText">
-      <string />
-     </property>
+     <widget class="QWidget" name="robot_content_widget">
+      <property name="sizePolicy">
+       <sizepolicy hsizetype="Expanding" vsizetype="Preferred">
+        <horstretch>0</horstretch>
+        <verstretch>0</verstretch>
+       </sizepolicy>
+      </property>
+      <layout class="QVBoxLayout" name="robot_content_layout">
+       <property name="leftMargin">
+        <number>0</number>
+       </property>
+       <property name="topMargin">
+        <number>0</number>
+       </property>
+       <property name="rightMargin">
+        <number>8</number>
+       </property>
+       <property name="bottomMargin">
+        <number>8</number>
+       </property>
+       <property name="spacing">
+        <number>8</number>
+       </property>
+       <item>
+        <layout class="QHBoxLayout" name="robot_header_layout" stretch="1,0">
+         <property name="leftMargin">
+          <number>0</number>
+         </property>
+         <property name="topMargin">
+          <number>0</number>
+         </property>
+         <property name="rightMargin">
+          <number>0</number>
+         </property>
+         <property name="bottomMargin">
+          <number>0</number>
+         </property>
+         <property name="spacing">
+          <number>8</number>
+         </property>
+         <item>
+          <layout class="QVBoxLayout" name="robot_identity_layout">
+           <property name="leftMargin">
+            <number>0</number>
+           </property>
+           <property name="topMargin">
+            <number>0</number>
+           </property>
+           <property name="rightMargin">
+            <number>0</number>
+           </property>
+           <property name="bottomMargin">
+            <number>0</number>
+           </property>
+           <property name="spacing">
+            <number>2</number>
+           </property>
+           <item>
+            <widget class="QLabel" name="robot_identity_label">
+             <property name="text">
+              <string>机器人</string>
+             </property>
+             <property name="role" stdset="0">
+              <string notr="true">sectionTitle</string>
+             </property>
+             <property name="wordWrap">
+              <bool>true</bool>
+             </property>
+             <property name="sizePolicy">
+              <sizepolicy hsizetype="Expanding" vsizetype="Preferred">
+               <horstretch>0</horstretch>
+               <verstretch>0</verstretch>
+              </sizepolicy>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QLabel" name="robot_endpoint_label">
+             <property name="text">
+              <string>连接信息未读取</string>
+             </property>
+             <property name="role" stdset="0">
+              <string notr="true">mutedText</string>
+             </property>
+             <property name="wordWrap">
+              <bool>true</bool>
+             </property>
+             <property name="sizePolicy">
+              <sizepolicy hsizetype="Expanding" vsizetype="Preferred">
+               <horstretch>0</horstretch>
+               <verstretch>0</verstretch>
+              </sizepolicy>
+             </property>
+            </widget>
+           </item>
+          </layout>
+         </item>
+         <item>
+          <widget class="QPushButton" name="robot_connection_button">
+           <property name="sizePolicy">
+            <sizepolicy hsizetype="Minimum" vsizetype="Fixed">
+             <horstretch>0</horstretch>
+             <verstretch>0</verstretch>
+            </sizepolicy>
+           </property>
+           <property name="text">
+            <string>前往设备连接</string>
+           </property>
+           <property name="role" stdset="0">
+            <string notr="true">quiet</string>
+           </property>
+           <property name="toolTip">
+            <string>打开设备连接页面</string>
+           </property>
+          </widget>
+         </item>
+        </layout>
+       </item>
+       <item>
+        <layout class="QGridLayout" name="robot_summary_grid" columnstretch="1,1,1">
+         <property name="leftMargin">
+          <number>0</number>
+         </property>
+         <property name="topMargin">
+          <number>0</number>
+         </property>
+         <property name="rightMargin">
+          <number>0</number>
+         </property>
+         <property name="bottomMargin">
+          <number>0</number>
+         </property>
+         <property name="spacing">
+          <number>8</number>
+         </property>
+         <item row="0" column="0">
+          <widget class="QWidget" name="robot_connection_summary">
+           <layout class="QHBoxLayout" name="robot_connection_layout" stretch="0,1">
+            <property name="leftMargin">
+             <number>0</number>
+            </property>
+            <property name="topMargin">
+             <number>0</number>
+            </property>
+            <property name="rightMargin">
+             <number>0</number>
+            </property>
+            <property name="bottomMargin">
+             <number>0</number>
+            </property>
+            <property name="spacing">
+             <number>8</number>
+            </property>
+            <item>
+             <widget class="QLabel" name="robot_connection_label">
+              <property name="text">
+               <string>机器人连接</string>
+              </property>
+              <property name="role" stdset="0">
+               <string notr="true">mutedText</string>
+              </property>
+              <property name="minimumSize">
+               <size>
+                <width>72</width>
+                <height>0</height>
+               </size>
+              </property>
+             </widget>
+            </item>
+            <item>
+             <widget class="QLabel" name="robot_connection_value">
+              <property name="text">
+               <string>未读取</string>
+              </property>
+              <property name="role" stdset="0">
+               <string notr="true">statusPill</string>
+              </property>
+              <property name="wordWrap">
+               <bool>true</bool>
+              </property>
+              <property name="sizePolicy">
+               <sizepolicy hsizetype="Expanding" vsizetype="Preferred">
+                <horstretch>0</horstretch>
+                <verstretch>0</verstretch>
+               </sizepolicy>
+              </property>
+              <property name="alignment">
+               <set>Qt::AlignCenter</set>
+              </property>
+             </widget>
+            </item>
+           </layout>
+          </widget>
+         </item>
+         <item row="0" column="1">
+          <widget class="QWidget" name="robot_servo_summary">
+           <layout class="QHBoxLayout" name="robot_servo_layout" stretch="0,1">
+            <property name="leftMargin">
+             <number>0</number>
+            </property>
+            <property name="topMargin">
+             <number>0</number>
+            </property>
+            <property name="rightMargin">
+             <number>0</number>
+            </property>
+            <property name="bottomMargin">
+             <number>0</number>
+            </property>
+            <property name="spacing">
+             <number>8</number>
+            </property>
+            <item>
+             <widget class="QLabel" name="robot_servo_label">
+              <property name="text">
+               <string>伺服状态</string>
+              </property>
+              <property name="role" stdset="0">
+               <string notr="true">mutedText</string>
+              </property>
+              <property name="minimumSize">
+               <size>
+                <width>72</width>
+                <height>0</height>
+               </size>
+              </property>
+             </widget>
+            </item>
+            <item>
+             <widget class="QLabel" name="robot_servo_value">
+              <property name="text">
+               <string>未读取</string>
+              </property>
+              <property name="role" stdset="0">
+               <string notr="true">statusPill</string>
+              </property>
+              <property name="wordWrap">
+               <bool>true</bool>
+              </property>
+              <property name="sizePolicy">
+               <sizepolicy hsizetype="Expanding" vsizetype="Preferred">
+                <horstretch>0</horstretch>
+                <verstretch>0</verstretch>
+               </sizepolicy>
+              </property>
+              <property name="alignment">
+               <set>Qt::AlignCenter</set>
+              </property>
+             </widget>
+            </item>
+           </layout>
+          </widget>
+         </item>
+         <item row="0" column="2">
+          <widget class="QWidget" name="robot_motion_summary">
+           <layout class="QHBoxLayout" name="robot_motion_layout" stretch="0,1">
+            <property name="leftMargin">
+             <number>0</number>
+            </property>
+            <property name="topMargin">
+             <number>0</number>
+            </property>
+            <property name="rightMargin">
+             <number>0</number>
+            </property>
+            <property name="bottomMargin">
+             <number>0</number>
+            </property>
+            <property name="spacing">
+             <number>8</number>
+            </property>
+            <item>
+             <widget class="QLabel" name="robot_motion_label">
+              <property name="text">
+               <string>运动状态</string>
+              </property>
+              <property name="role" stdset="0">
+               <string notr="true">mutedText</string>
+              </property>
+              <property name="minimumSize">
+               <size>
+                <width>72</width>
+                <height>0</height>
+               </size>
+              </property>
+             </widget>
+            </item>
+            <item>
+             <widget class="QLabel" name="robot_motion_value">
+              <property name="text">
+               <string>未读取</string>
+              </property>
+              <property name="role" stdset="0">
+               <string notr="true">statusPill</string>
+              </property>
+              <property name="wordWrap">
+               <bool>true</bool>
+              </property>
+              <property name="sizePolicy">
+               <sizepolicy hsizetype="Expanding" vsizetype="Preferred">
+                <horstretch>0</horstretch>
+                <verstretch>0</verstretch>
+               </sizepolicy>
+              </property>
+              <property name="alignment">
+               <set>Qt::AlignCenter</set>
+              </property>
+             </widget>
+            </item>
+           </layout>
+          </widget>
+         </item>
+         <item row="1" column="0">
+          <widget class="QWidget" name="robot_master_summary">
+           <layout class="QHBoxLayout" name="robot_master_layout" stretch="0,1">
+            <property name="leftMargin">
+             <number>0</number>
+            </property>
+            <property name="topMargin">
+             <number>0</number>
+            </property>
+            <property name="rightMargin">
+             <number>0</number>
+            </property>
+            <property name="bottomMargin">
+             <number>0</number>
+            </property>
+            <property name="spacing">
+             <number>8</number>
+            </property>
+            <item>
+             <widget class="QLabel" name="robot_master_label">
+              <property name="text">
+               <string>主控设备</string>
+              </property>
+              <property name="role" stdset="0">
+               <string notr="true">mutedText</string>
+              </property>
+              <property name="minimumSize">
+               <size>
+                <width>72</width>
+                <height>0</height>
+               </size>
+              </property>
+             </widget>
+            </item>
+            <item>
+             <widget class="QLabel" name="robot_master_value">
+              <property name="text">
+               <string>未读取</string>
+              </property>
+              <property name="role" stdset="0">
+               <string notr="true">statusPill</string>
+              </property>
+              <property name="wordWrap">
+               <bool>true</bool>
+              </property>
+              <property name="sizePolicy">
+               <sizepolicy hsizetype="Expanding" vsizetype="Preferred">
+                <horstretch>0</horstretch>
+                <verstretch>0</verstretch>
+               </sizepolicy>
+              </property>
+              <property name="alignment">
+               <set>Qt::AlignCenter</set>
+              </property>
+             </widget>
+            </item>
+           </layout>
+          </widget>
+         </item>
+         <item row="1" column="1">
+          <widget class="QWidget" name="robot_hand_summary">
+           <layout class="QHBoxLayout" name="robot_hand_layout" stretch="0,1">
+            <property name="leftMargin">
+             <number>0</number>
+            </property>
+            <property name="topMargin">
+             <number>0</number>
+            </property>
+            <property name="rightMargin">
+             <number>0</number>
+            </property>
+            <property name="bottomMargin">
+             <number>0</number>
+            </property>
+            <property name="spacing">
+             <number>8</number>
+            </property>
+            <item>
+             <widget class="QLabel" name="robot_hand_label">
+              <property name="text">
+               <string>灵巧手</string>
+              </property>
+              <property name="role" stdset="0">
+               <string notr="true">mutedText</string>
+              </property>
+              <property name="minimumSize">
+               <size>
+                <width>72</width>
+                <height>0</height>
+               </size>
+              </property>
+             </widget>
+            </item>
+            <item>
+             <widget class="QLabel" name="robot_hand_value">
+              <property name="text">
+               <string>未读取</string>
+              </property>
+              <property name="role" stdset="0">
+               <string notr="true">statusPill</string>
+              </property>
+              <property name="wordWrap">
+               <bool>true</bool>
+              </property>
+              <property name="sizePolicy">
+               <sizepolicy hsizetype="Expanding" vsizetype="Preferred">
+                <horstretch>0</horstretch>
+                <verstretch>0</verstretch>
+               </sizepolicy>
+              </property>
+              <property name="alignment">
+               <set>Qt::AlignCenter</set>
+              </property>
+             </widget>
+            </item>
+           </layout>
+          </widget>
+         </item>
+         <item row="1" column="2">
+          <widget class="QWidget" name="robot_recording_summary">
+           <layout class="QHBoxLayout" name="robot_recording_layout" stretch="0,1">
+            <property name="leftMargin">
+             <number>0</number>
+            </property>
+            <property name="topMargin">
+             <number>0</number>
+            </property>
+            <property name="rightMargin">
+             <number>0</number>
+            </property>
+            <property name="bottomMargin">
+             <number>0</number>
+            </property>
+            <property name="spacing">
+             <number>8</number>
+            </property>
+            <item>
+             <widget class="QLabel" name="robot_recording_label">
+              <property name="text">
+               <string>录制状态</string>
+              </property>
+              <property name="role" stdset="0">
+               <string notr="true">mutedText</string>
+              </property>
+              <property name="minimumSize">
+               <size>
+                <width>72</width>
+                <height>0</height>
+               </size>
+              </property>
+             </widget>
+            </item>
+            <item>
+             <widget class="QLabel" name="robot_recording_value">
+              <property name="text">
+               <string>未读取</string>
+              </property>
+              <property name="role" stdset="0">
+               <string notr="true">statusPill</string>
+              </property>
+              <property name="wordWrap">
+               <bool>true</bool>
+              </property>
+              <property name="sizePolicy">
+               <sizepolicy hsizetype="Expanding" vsizetype="Preferred">
+                <horstretch>0</horstretch>
+                <verstretch>0</verstretch>
+               </sizepolicy>
+              </property>
+              <property name="alignment">
+               <set>Qt::AlignCenter</set>
+              </property>
+             </widget>
+            </item>
+           </layout>
+          </widget>
+         </item>
+        </layout>
+       </item>
+       <item>
+        <layout class="QVBoxLayout" name="robot_fault_layout">
+         <property name="leftMargin">
+          <number>0</number>
+         </property>
+         <property name="topMargin">
+          <number>0</number>
+         </property>
+         <property name="rightMargin">
+          <number>0</number>
+         </property>
+         <property name="bottomMargin">
+          <number>0</number>
+         </property>
+         <property name="spacing">
+          <number>4</number>
+         </property>
+         <item>
+          <widget class="QLabel" name="robot_fault_banner">
+           <property name="text">
+            <string>暂无故障</string>
+           </property>
+           <property name="role" stdset="0">
+            <string notr="true">faultBanner</string>
+           </property>
+           <property name="wordWrap">
+            <bool>true</bool>
+           </property>
+           <property name="visible">
+            <bool>false</bool>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QLabel" name="robot_fault_code">
+           <property name="text">
+            <string />
+           </property>
+           <property name="role" stdset="0">
+            <string notr="true">mutedText</string>
+           </property>
+           <property name="wordWrap">
+            <bool>true</bool>
+           </property>
+           <property name="visible">
+            <bool>false</bool>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QLabel" name="robot_fault_hint">
+           <property name="text">
+            <string />
+           </property>
+           <property name="role" stdset="0">
+            <string notr="true">mutedText</string>
+           </property>
+           <property name="wordWrap">
+            <bool>true</bool>
+           </property>
+           <property name="visible">
+            <bool>false</bool>
+           </property>
+          </widget>
+         </item>
+        </layout>
+       </item>
+       <item>
+        <widget class="QLabel" name="robot_feedback_hint">
+         <property name="text">
+          <string>位置反馈为手动读取的快照；点击“读取机器人反馈”更新。</string>
+         </property>
+         <property name="role" stdset="0">
+          <string notr="true">mutedText</string>
+         </property>
+         <property name="wordWrap">
+          <bool>true</bool>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <layout class="QHBoxLayout" name="robot_positions_layout" stretch="1,1">
+         <property name="leftMargin">
+          <number>0</number>
+         </property>
+         <property name="topMargin">
+          <number>0</number>
+         </property>
+         <property name="rightMargin">
+          <number>0</number>
+         </property>
+         <property name="bottomMargin">
+          <number>0</number>
+         </property>
+         <property name="spacing">
+          <number>12</number>
+         </property>
+         <item>
+          <layout class="QVBoxLayout" name="robot_joint_layout_column">
+           <property name="leftMargin">
+            <number>0</number>
+           </property>
+           <property name="topMargin">
+            <number>0</number>
+           </property>
+           <property name="rightMargin">
+            <number>0</number>
+           </property>
+           <property name="bottomMargin">
+            <number>0</number>
+           </property>
+           <property name="spacing">
+            <number>4</number>
+           </property>
+           <item>
+            <widget class="QLabel" name="robot_joint_heading">
+             <property name="text">
+              <string>关节位置</string>
+             </property>
+             <property name="role" stdset="0">
+              <string notr="true">sectionTitle</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QTableWidget" name="robot_joint_table">
+             <property name="sizePolicy">
+              <sizepolicy hsizetype="Expanding" vsizetype="Fixed">
+               <horstretch>0</horstretch>
+               <verstretch>0</verstretch>
+              </sizepolicy>
+             </property>
+             <property name="minimumSize">
+              <size>
+               <width>260</width>
+               <height>186</height>
+              </size>
+             </property>
+             <property name="maximumSize">
+              <size>
+               <width>16777215</width>
+               <height>186</height>
+              </size>
+             </property>
+             <property name="accessibleName">
+              <string>关节位置</string>
+             </property>
+             <property name="editTriggers">
+              <set>QAbstractItemView::NoEditTriggers</set>
+             </property>
+             <property name="alternatingRowColors">
+              <bool>true</bool>
+             </property>
+             <property name="selectionMode">
+              <enum>QAbstractItemView::ContiguousSelection</enum>
+             </property>
+             <property name="selectionBehavior">
+              <enum>QAbstractItemView::SelectItems</enum>
+             </property>
+             <property name="horizontalScrollBarPolicy">
+              <enum>Qt::ScrollBarAlwaysOff</enum>
+             </property>
+             <property name="verticalScrollBarPolicy">
+              <enum>Qt::ScrollBarAlwaysOff</enum>
+             </property>
+             <property name="showGrid">
+              <bool>true</bool>
+             </property>
+             <property name="wordWrap">
+              <bool>false</bool>
+             </property>
+             <property name="rowCount">
+              <number>6</number>
+             </property>
+             <property name="columnCount">
+              <number>2</number>
+             </property>
+             <attribute name="horizontalHeaderDefaultSectionSize">
+              <number>110</number>
+             </attribute>
+             <attribute name="horizontalHeaderStretchLastSection">
+              <bool>true</bool>
+             </attribute>
+             <attribute name="verticalHeaderVisible">
+              <bool>false</bool>
+             </attribute>
+             <attribute name="verticalHeaderDefaultSectionSize">
+              <number>24</number>
+             </attribute>
+             <attribute name="verticalHeaderMinimumSectionSize">
+              <number>24</number>
+             </attribute>
+             <row />
+             <row />
+             <row />
+             <row />
+             <row />
+             <row />
+             <column>
+              <property name="text">
+               <string>关节</string>
+              </property>
+             </column>
+             <column>
+              <property name="text">
+               <string>角度 (°)</string>
+              </property>
+             </column>
+             <item row="0" column="0">
+              <property name="text">
+               <string>J1</string>
+              </property>
+             </item>
+             <item row="0" column="1">
+              <property name="text">
+               <string>未读取</string>
+              </property>
+              <property name="textAlignment">
+               <set>Qt::AlignRight|Qt::AlignVCenter</set>
+              </property>
+             </item>
+             <item row="1" column="0">
+              <property name="text">
+               <string>J2</string>
+              </property>
+             </item>
+             <item row="1" column="1">
+              <property name="text">
+               <string>未读取</string>
+              </property>
+              <property name="textAlignment">
+               <set>Qt::AlignRight|Qt::AlignVCenter</set>
+              </property>
+             </item>
+             <item row="2" column="0">
+              <property name="text">
+               <string>J3</string>
+              </property>
+             </item>
+             <item row="2" column="1">
+              <property name="text">
+               <string>未读取</string>
+              </property>
+              <property name="textAlignment">
+               <set>Qt::AlignRight|Qt::AlignVCenter</set>
+              </property>
+             </item>
+             <item row="3" column="0">
+              <property name="text">
+               <string>J4</string>
+              </property>
+             </item>
+             <item row="3" column="1">
+              <property name="text">
+               <string>未读取</string>
+              </property>
+              <property name="textAlignment">
+               <set>Qt::AlignRight|Qt::AlignVCenter</set>
+              </property>
+             </item>
+             <item row="4" column="0">
+              <property name="text">
+               <string>J5</string>
+              </property>
+             </item>
+             <item row="4" column="1">
+              <property name="text">
+               <string>未读取</string>
+              </property>
+              <property name="textAlignment">
+               <set>Qt::AlignRight|Qt::AlignVCenter</set>
+              </property>
+             </item>
+             <item row="5" column="0">
+              <property name="text">
+               <string>J6</string>
+              </property>
+             </item>
+             <item row="5" column="1">
+              <property name="text">
+               <string>未读取</string>
+              </property>
+              <property name="textAlignment">
+               <set>Qt::AlignRight|Qt::AlignVCenter</set>
+              </property>
+             </item>
+            </widget>
+           </item>
+          </layout>
+         </item>
+         <item>
+          <layout class="QVBoxLayout" name="robot_tcp_layout_column">
+           <property name="leftMargin">
+            <number>0</number>
+           </property>
+           <property name="topMargin">
+            <number>0</number>
+           </property>
+           <property name="rightMargin">
+            <number>0</number>
+           </property>
+           <property name="bottomMargin">
+            <number>0</number>
+           </property>
+           <property name="spacing">
+            <number>4</number>
+           </property>
+           <item>
+            <widget class="QLabel" name="robot_tcp_heading">
+             <property name="text">
+              <string>TCP 位姿</string>
+             </property>
+             <property name="role" stdset="0">
+              <string notr="true">sectionTitle</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QTableWidget" name="robot_tcp_table">
+             <property name="sizePolicy">
+              <sizepolicy hsizetype="Expanding" vsizetype="Fixed">
+               <horstretch>0</horstretch>
+               <verstretch>0</verstretch>
+              </sizepolicy>
+             </property>
+             <property name="minimumSize">
+              <size>
+               <width>260</width>
+               <height>186</height>
+              </size>
+             </property>
+             <property name="maximumSize">
+              <size>
+               <width>16777215</width>
+               <height>186</height>
+              </size>
+             </property>
+             <property name="accessibleName">
+              <string>TCP 位姿</string>
+             </property>
+             <property name="editTriggers">
+              <set>QAbstractItemView::NoEditTriggers</set>
+             </property>
+             <property name="alternatingRowColors">
+              <bool>true</bool>
+             </property>
+             <property name="selectionMode">
+              <enum>QAbstractItemView::ContiguousSelection</enum>
+             </property>
+             <property name="selectionBehavior">
+              <enum>QAbstractItemView::SelectItems</enum>
+             </property>
+             <property name="horizontalScrollBarPolicy">
+              <enum>Qt::ScrollBarAlwaysOff</enum>
+             </property>
+             <property name="verticalScrollBarPolicy">
+              <enum>Qt::ScrollBarAlwaysOff</enum>
+             </property>
+             <property name="showGrid">
+              <bool>true</bool>
+             </property>
+             <property name="wordWrap">
+              <bool>false</bool>
+             </property>
+             <property name="rowCount">
+              <number>6</number>
+             </property>
+             <property name="columnCount">
+              <number>2</number>
+             </property>
+             <attribute name="horizontalHeaderDefaultSectionSize">
+              <number>110</number>
+             </attribute>
+             <attribute name="horizontalHeaderStretchLastSection">
+              <bool>true</bool>
+             </attribute>
+             <attribute name="verticalHeaderVisible">
+              <bool>false</bool>
+             </attribute>
+             <attribute name="verticalHeaderDefaultSectionSize">
+              <number>24</number>
+             </attribute>
+             <attribute name="verticalHeaderMinimumSectionSize">
+              <number>24</number>
+             </attribute>
+             <row />
+             <row />
+             <row />
+             <row />
+             <row />
+             <row />
+             <column>
+              <property name="text">
+               <string>分量</string>
+              </property>
+             </column>
+             <column>
+              <property name="text">
+               <string>位置 / 角度</string>
+              </property>
+             </column>
+             <item row="0" column="0">
+              <property name="text">
+               <string>X (mm)</string>
+              </property>
+             </item>
+             <item row="0" column="1">
+              <property name="text">
+               <string>未读取</string>
+              </property>
+              <property name="textAlignment">
+               <set>Qt::AlignRight|Qt::AlignVCenter</set>
+              </property>
+             </item>
+             <item row="1" column="0">
+              <property name="text">
+               <string>Y (mm)</string>
+              </property>
+             </item>
+             <item row="1" column="1">
+              <property name="text">
+               <string>未读取</string>
+              </property>
+              <property name="textAlignment">
+               <set>Qt::AlignRight|Qt::AlignVCenter</set>
+              </property>
+             </item>
+             <item row="2" column="0">
+              <property name="text">
+               <string>Z (mm)</string>
+              </property>
+             </item>
+             <item row="2" column="1">
+              <property name="text">
+               <string>未读取</string>
+              </property>
+              <property name="textAlignment">
+               <set>Qt::AlignRight|Qt::AlignVCenter</set>
+              </property>
+             </item>
+             <item row="3" column="0">
+              <property name="text">
+               <string>Rx (°)</string>
+              </property>
+             </item>
+             <item row="3" column="1">
+              <property name="text">
+               <string>未读取</string>
+              </property>
+              <property name="textAlignment">
+               <set>Qt::AlignRight|Qt::AlignVCenter</set>
+              </property>
+             </item>
+             <item row="4" column="0">
+              <property name="text">
+               <string>Ry (°)</string>
+              </property>
+             </item>
+             <item row="4" column="1">
+              <property name="text">
+               <string>未读取</string>
+              </property>
+              <property name="textAlignment">
+               <set>Qt::AlignRight|Qt::AlignVCenter</set>
+              </property>
+             </item>
+             <item row="5" column="0">
+              <property name="text">
+               <string>Rz (°)</string>
+              </property>
+             </item>
+             <item row="5" column="1">
+              <property name="text">
+               <string>未读取</string>
+              </property>
+              <property name="textAlignment">
+               <set>Qt::AlignRight|Qt::AlignVCenter</set>
+              </property>
+             </item>
+            </widget>
+           </item>
+          </layout>
+         </item>
+        </layout>
+       </item>
+       <item>
+        <layout class="QHBoxLayout" name="robot_details_toggle_layout">
+         <property name="leftMargin">
+          <number>0</number>
+         </property>
+         <property name="topMargin">
+          <number>0</number>
+         </property>
+         <property name="rightMargin">
+          <number>0</number>
+         </property>
+         <property name="bottomMargin">
+          <number>0</number>
+         </property>
+         <property name="spacing">
+          <number>8</number>
+         </property>
+         <item>
+          <widget class="QToolButton" name="robot_details_toggle">
+           <property name="sizePolicy">
+            <sizepolicy hsizetype="Minimum" vsizetype="Fixed">
+             <horstretch>0</horstretch>
+             <verstretch>0</verstretch>
+            </sizepolicy>
+           </property>
+           <property name="text">
+            <string>技术详情</string>
+           </property>
+           <property name="checkable">
+            <bool>true</bool>
+           </property>
+           <property name="checked">
+            <bool>false</bool>
+           </property>
+           <property name="toolButtonStyle">
+            <enum>Qt::ToolButtonTextBesideIcon</enum>
+           </property>
+           <property name="arrowType">
+            <enum>Qt::RightArrow</enum>
+           </property>
+           <property name="toolTip">
+            <string>展开版本、配置和诊断信息</string>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <spacer name="robot_details_toggle_spacer">
+           <property name="orientation">
+            <enum>Qt::Horizontal</enum>
+           </property>
+           <property name="sizeHint">
+            <size>
+             <width>20</width>
+             <height>0</height>
+            </size>
+           </property>
+          </spacer>
+         </item>
+        </layout>
+       </item>
+       <item>
+        <widget class="QWidget" name="robot_technical_panel">
+         <property name="visible">
+          <bool>false</bool>
+         </property>
+         <layout class="QVBoxLayout" name="robot_technical_layout">
+          <property name="leftMargin">
+           <number>0</number>
+          </property>
+          <property name="topMargin">
+           <number>0</number>
+          </property>
+          <property name="rightMargin">
+           <number>0</number>
+          </property>
+          <property name="bottomMargin">
+           <number>0</number>
+          </property>
+          <property name="spacing">
+           <number>6</number>
+          </property>
+          <item>
+           <widget class="QPlainTextEdit" name="robot_details">
+            <property name="sizePolicy">
+             <sizepolicy hsizetype="Expanding" vsizetype="Fixed">
+              <horstretch>0</horstretch>
+              <verstretch>0</verstretch>
+             </sizepolicy>
+            </property>
+            <property name="minimumSize">
+             <size>
+              <width>0</width>
+              <height>96</height>
+             </size>
+            </property>
+            <property name="maximumSize">
+             <size>
+              <width>16777215</width>
+              <height>140</height>
+             </size>
+            </property>
+            <property name="readOnly">
+             <bool>true</bool>
+            </property>
+            <property name="lineWrapMode">
+             <enum>QPlainTextEdit::NoWrap</enum>
+            </property>
+            <property name="placeholderText">
+             <string>诊断信息将在此显示</string>
+            </property>
+            <property name="accessibleName">
+             <string>机器人技术详情</string>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <layout class="QHBoxLayout" name="robot_details_actions_layout">
+            <property name="leftMargin">
+             <number>0</number>
+            </property>
+            <property name="topMargin">
+             <number>0</number>
+            </property>
+            <property name="rightMargin">
+             <number>0</number>
+            </property>
+            <property name="bottomMargin">
+             <number>0</number>
+            </property>
+            <property name="spacing">
+             <number>8</number>
+            </property>
+            <item>
+             <spacer name="robot_copy_details_spacer">
+              <property name="orientation">
+               <enum>Qt::Horizontal</enum>
+              </property>
+              <property name="sizeHint">
+               <size>
+                <width>20</width>
+                <height>0</height>
+               </size>
+              </property>
+             </spacer>
+            </item>
+            <item>
+             <widget class="QPushButton" name="robot_copy_details_button">
+              <property name="sizePolicy">
+               <sizepolicy hsizetype="Minimum" vsizetype="Fixed">
+                <horstretch>0</horstretch>
+                <verstretch>0</verstretch>
+               </sizepolicy>
+              </property>
+              <property name="text">
+               <string>复制诊断信息</string>
+              </property>
+              <property name="role" stdset="0">
+               <string notr="true">quiet</string>
+              </property>
+             </widget>
+            </item>
+           </layout>
+          </item>
+         </layout>
+        </widget>
+       </item>
+       <item>
+        <spacer name="robot_content_spacer">
+         <property name="orientation">
+          <enum>Qt::Vertical</enum>
+         </property>
+         <property name="sizeHint">
+          <size>
+           <width>0</width>
+           <height>8</height>
+          </size>
+         </property>
+        </spacer>
+       </item>
+      </layout>
+     </widget>
     </widget>
    </item>
    <item>
-    <layout class="QHBoxLayout" name="robot_HBoxLayout_1" stretch="0,0,0">
+    <layout class="QHBoxLayout" name="robot_actions_layout">
      <property name="leftMargin">
       <number>0</number>
      </property>
@@ -63,7 +1223,7 @@
       <number>0</number>
      </property>
      <property name="spacing">
-      <number>6</number>
+      <number>8</number>
      </property>
      <item>
       <widget class="QPushButton" name="robot_refresh_button">
@@ -76,7 +1236,26 @@
        <property name="text">
         <string>读取机器人反馈</string>
        </property>
+       <property name="role" stdset="0">
+        <string notr="true">primary</string>
+       </property>
+       <property name="toolTip">
+        <string>手动读取关节位置、TCP 位姿及机器人状态</string>
+       </property>
       </widget>
+     </item>
+     <item>
+      <spacer name="robot_actions_spacer">
+       <property name="orientation">
+        <enum>Qt::Horizontal</enum>
+       </property>
+       <property name="sizeHint">
+        <size>
+         <width>20</width>
+         <height>0</height>
+        </size>
+       </property>
+      </spacer>
      </item>
      <item>
       <widget class="QPushButton" name="robot_reset_fault_button">
