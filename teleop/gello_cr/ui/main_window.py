@@ -230,12 +230,14 @@ class OperatorMainWindow(QMainWindow):
             and not pending.intersection(
                 {
                     Command.RETURN_HOME,
+                    Command.HOME_AND_SAVE_EPISODE,
                     Command.STOP_MOTION,
                     Command.EMERGENCY_STOP,
                     Command.REPORT_FAULT,
                 }
             )
         )
+        self.collection.return_home_button.setEnabled(self.home_button.isEnabled())
         self.stop_motion_button.setEnabled(view.actions[Command.STOP_MOTION])
         self.estop_button.setEnabled(view.actions[Command.EMERGENCY_STOP])
         render_status(self, frame, pending, self._local_error)

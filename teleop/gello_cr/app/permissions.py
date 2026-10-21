@@ -5,7 +5,7 @@ runtime boundary immediately before a producer obtains its motion lease.
 """
 
 from collections.abc import Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Any
 
 from teleop.gello_cr.core.state_machine import (
@@ -73,6 +73,40 @@ def operation_permission(command, context, payload=None):
     def deny(reason):
         return OperationPermission(False, reason)
 
+    if command in (
+        Command.START_COLLECTION,
+        Command.FINISH_COLLECTION,
+        Command.HOME_AND_SAVE_EPISODE,
+    ):
+        if not machine.can(command, source=source):
+            if command is Command.START_COLLECTION:
+                if episode_open:
+                    return deny("请先保存或丢弃当前 Episode，再开始采集")
+                if source != "teleop":
+                    return deny("联动采集只用于遥操；其他来源请先启动对应运动")
+                return operation_permission(Command.START_TELEOP, context, data)
+            if command is Command.HOME_AND_SAVE_EPISODE:
+                if recording is not RecordingState.RECORDING:
+                    return deny("请先开始采集；待处理 Episode 请直接保存或丢弃")
+                return operation_permission(Command.RETURN_HOME, context, data)
+            return deny(
+                "正在回 HOME，请等待到位"
+                if state is WorkflowState.RETURNING_HOME
+                else "当前没有待保存的 Episode"
+            )
+        if command is Command.START_COLLECTION:
+            # The compound action explicitly starts follow before capture. All
+            # ordinary capture readiness checks still apply to that target state.
+            return operation_permission(
+                Command.START_EPISODE, replace(context, state=WorkflowState.TELEOP_RUNNING), data
+            )
+        if command is Command.HOME_AND_SAVE_EPISODE:
+            home = operation_permission(Command.RETURN_HOME, context, data)
+            if not home.allowed:
+                return home
+            return operation_permission(Command.FINISH_EPISODE, context, {"outcome": "success"})
+        return operation_permission(Command.FINISH_EPISODE, context, data)
+
     if command in SAFETY_COMMANDS:
         return OperationPermission(
             machine.can(command), "当前安全状态已生效" if not machine.can(command) else ""
@@ -123,7 +157,12 @@ def operation_permission(command, context, payload=None):
                 return deny("当前机器人不支持此操作")
     if command is Command.RETURN_HOME:
         if runtime.get("state", "idle") not in (
-            "idle", "following", "replay", "point_move", "dagger", "master_free"
+            "idle",
+            "following",
+            "replay",
+            "point_move",
+            "dagger",
+            "master_free",
         ) or runtime.get("o6_action_active"):
             return deny("HOME 或手部恢复动作正在执行，请先等待完成或停止")
     if command in (Command.PREPARE_DEVICES, Command.STOP_CAMERAS) and episode_open:

@@ -15,7 +15,7 @@ from teleop.gello_cr.trajectory import ReplayMode, ReplayOptions
 from .background import BackgroundJobs
 from .datasets import DatasetCatalog
 from .permissions import OperationContext, operation_permission
-from .service import ApplicationService
+from .service import ApplicationService, CommandSuperseded
 
 LifecycleCallback = Callable[[], Any]
 
@@ -210,6 +210,13 @@ class RuntimeCommandBindings:
 
     def _stop_teleop(self, payload: Mapping[str, Any]) -> Any:
         reason = str(payload.get("reason", "application command")).strip() or "application command"
+        if payload.get("follow_started_at") is not None:
+            stopped = self.teleop_engine.stop_follow(
+                reason, expected_started_at=payload["follow_started_at"]
+            )
+            if stopped is False:
+                raise CommandSuperseded("原采集遥操已被 HOME 或其他运动接管")
+            return stopped
         return self.teleop_engine.stop_follow(reason)
 
     def _start_episode(self, payload: Mapping[str, Any]) -> Any:
@@ -219,6 +226,10 @@ class RuntimeCommandBindings:
         metadata = payload.get("metadata")
         if metadata is not None and not isinstance(metadata, Mapping):
             raise TypeError("metadata must be a mapping")
+        wait_ready = getattr(self.teleop_engine, "wait_follow_ready", None)
+        if payload.get("source", "teleop") == "teleop" and callable(wait_ready):
+            wait_ready()
+            self._require_permission(Command.START_EPISODE, payload)
         return self.recorder.start_episode(
             task,
             base_root,
@@ -380,7 +391,10 @@ class RuntimeCommandBindings:
             pass
 
     def _stop_trajectory_recording(self, payload):
-        if "recording_run" in payload and payload["recording_run"] != self._trajectory_recording_run:
+        if (
+            "recording_run" in payload
+            and payload["recording_run"] != self._trajectory_recording_run
+        ):
             raise InvalidTransition("Trajectory recording completion belongs to an earlier run")
         self._trajectory_recording_run = None
         try:

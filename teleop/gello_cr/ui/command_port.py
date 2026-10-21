@@ -158,11 +158,14 @@ class AsyncApplicationCommandPort:
             if self._closed:
                 raise CommandPortClosed("command port is closed")
 
-            if request.command in self._pending:
+            home_commands = {Command.RETURN_HOME, Command.HOME_AND_SAVE_EPISODE}
+            if request.command in self._pending or (
+                request.command in home_commands and self._pending.intersection(home_commands)
+            ):
                 raise CommandAlreadyPending(f"{request.command.name} is already pending")
             target = (
                 self._home_queue
-                if request.command is Command.RETURN_HOME
+                if request.command in home_commands
                 else self._safety_queue
                 if request.command in _SAFETY_COMMANDS
                 else self._normal_queue

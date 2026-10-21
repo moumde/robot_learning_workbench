@@ -32,6 +32,70 @@ class TeleopService:
     def __init__(self, runtime):
         self.runtime = runtime
 
+    def wait_follow_ready(self, timeout=3.0):
+        """Wait for this producer's first accepted action before Dataset capture."""
+        runtime = self.runtime
+        generation, lease = runtime.stop_generation, runtime._follow_lease
+        deadline = time.monotonic() + timeout
+        while True:
+            if (
+                runtime.stop_generation != generation
+                or runtime.state != "following"
+                or runtime._follow_stop.is_set()
+            ):
+                raise RuntimeError(runtime.last_error or "遥操启动已被 HOME、停止或故障中断")
+            if lease is None:
+                raise RuntimeError("遥操运动会话尚未建立")
+            lease.check()
+            with runtime._state_lock:
+                telemetry = runtime._gello_telemetry
+            needs_telemetry = (
+                runtime.master_type == "gello"
+                and runtime.store.data["gello"]["control_mode"] == "joint"
+            )
+            if runtime.motion.status.last_command_at is not None and (
+                not needs_telemetry or telemetry and telemetry.get("sent_count", 0) > 0
+            ):
+                return
+            if time.monotonic() >= deadline:
+                raise TimeoutError("遥操未能发出首条有效目标，未开始采集")
+            runtime._follow_stop.wait(0.01)
+
+    def stop_follow_session(self, started_at):
+        """Stop only the producer captured when collection cleanup was requested."""
+        runtime = self.runtime
+        with runtime._state_lock:
+            status = runtime.motion.status
+            if status.source is not MotionSource.TELEOP or status.started_at != started_at:
+                return False
+            lease, thread = runtime._follow_lease, runtime._follow_thread
+            generation = runtime._stop_generation
+            if lease is None or not lease.active:
+                return False
+            runtime._follow_stop.set()
+        error = None
+        try:
+            lease.stop()
+        except Exception as exc:
+            error = exc
+        if thread is not None and thread is not threading.current_thread():
+            thread.join(2.0)
+            if thread.is_alive():
+                error = error or TimeoutError("采集遥操线程未及时停止")
+        try:
+            lease.release(error=error)
+        except Exception as exc:
+            error = error or exc
+        with runtime._state_lock:
+            if runtime._stop_generation != generation or runtime._follow_thread is not thread:
+                return False
+            if error is not None:
+                runtime._set_state("fault", str(error))
+                raise error
+            if runtime.state == "following":
+                runtime._set_state("idle")
+        return True
+
     def start_follow(self) -> None:
         if self.runtime._home_lock.locked():
             raise RuntimeError("HOME 回位正在执行")

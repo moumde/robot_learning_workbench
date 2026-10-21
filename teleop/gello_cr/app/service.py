@@ -190,28 +190,34 @@ class ApplicationService:
     ) -> CommandResult:
         data = MappingProxyType(dict(payload or {}))
 
-        if command is Command.RETURN_HOME:
-            return self._dispatch_home(data)
+        if command in (Command.RETURN_HOME, Command.HOME_AND_SAVE_EPISODE):
+            return self._dispatch_home(data, save_episode=command is Command.HOME_AND_SAVE_EPISODE)
 
         if command in _PRETRANSITION_COMMANDS:
             return self._dispatch_safety(command, data)
 
         with self._normal_dispatch_lock:
+            if command is Command.START_COLLECTION:
+                return self._dispatch_collection_start(data)
+            if command is Command.FINISH_COLLECTION:
+                return self._dispatch_collection_finish(data)
             return self._dispatch_normal(command, data)
 
-    def _dispatch_home(self, data: Mapping[str, Any]) -> CommandResult:
-        command = Command.RETURN_HOME
+    def _dispatch_home(self, data: Mapping[str, Any], *, save_episode=False) -> CommandResult:
+        command = Command.HOME_AND_SAVE_EPISODE if save_episode else Command.RETURN_HOME
         with self._lock:
             self._validate_locked(command, data)
-            handler = self._handlers[command]
+            handler = self._handlers[Command.RETURN_HOME]
             previous = self._state_machine.state
             self._preemption_generation += 1
             generation = self._preemption_generation
-            self._state_machine.apply(command)
+            self._state_machine.apply(Command.RETURN_HOME)
             self._emit_locked(
                 kind="state_changed",
                 level=EventLevel.INFO,
-                message="机械臂正在回 HOME",
+                message="正在回 HOME，到位后保存成功 Episode"
+                if save_episode
+                else "机械臂正在回 HOME",
                 command=command,
                 details=data,
             )
@@ -232,13 +238,106 @@ class ApplicationService:
             state = self._state_machine.apply(Command.HOME_COMPLETED)
             self._last_error = ""
             self._emit_locked(
-                kind="command_completed",
+                kind="home_arrived" if save_episode else "command_completed",
                 level=EventLevel.INFO,
                 message="机械臂已回 HOME，保持停止",
                 command=command,
                 details=data,
             )
-            return CommandResult(command, previous, state, value)
+        if save_episode:
+            with self._normal_dispatch_lock:
+                result = self._dispatch_collection_finish(
+                    MappingProxyType({"outcome": "success"}), expected_generation=generation
+                )
+            return self._collection_completed(command, previous, result, data)
+        return CommandResult(command, previous, state, value)
+
+    def _collection_completed(self, command, previous, result, data):
+        with self._lock:
+            self._emit_locked(
+                kind="command_completed",
+                level=EventLevel.INFO,
+                message="采集已开始"
+                if command is Command.START_COLLECTION
+                else "Episode 已保存，保持停止",
+                command=command,
+                details=data,
+            )
+        return CommandResult(command, previous, result.state, result.value)
+
+    def _dispatch_collection_start(self, data):
+        with self._lock:
+            self._validate_locked(Command.START_COLLECTION, data)
+            previous = self._state_machine.state
+            generation = self._preemption_generation
+        # Reject incomplete form data before creating a motion producer.
+        for key in ("task", "base_root"):
+            if not str(data.get(key, "")).strip():
+                raise ValueError(f"{key} is required")
+        if data.get("metadata") is not None and not isinstance(data["metadata"], Mapping):
+            raise TypeError("metadata must be a mapping")
+        started_follow = previous is WorkflowState.ROBOT_ENABLED
+        if started_follow:
+            self._dispatch_normal(Command.START_TELEOP, data, expected_generation=generation)
+        try:
+            result = self._dispatch_normal(
+                Command.START_EPISODE, data, expected_generation=generation
+            )
+        except Exception:
+            with self._lock:
+                owns_follow = (
+                    started_follow
+                    and self._preemption_generation == generation
+                    and self._state_machine.state is WorkflowState.TELEOP_RUNNING
+                )
+            if owns_follow:
+                self._collection_stop(Command.STOP_TELEOP, generation)
+            raise
+        return self._collection_completed(Command.START_COLLECTION, previous, result, data)
+
+    def _collection_stop(self, command, generation):
+        with self._lock:
+            if self._preemption_generation != generation:
+                raise CommandSuperseded("采集停止已被 HOME、停止或故障中断")
+            payload = {"reason": "结束采集"}
+            if command is Command.STOP_TELEOP and self._runtime_snapshot is not None:
+                motion = (self._runtime_snapshot() or {}).get("motion", {})
+                payload["follow_started_at"] = motion.get("started_at")
+        try:
+            return self._dispatch_normal(
+                command, MappingProxyType(payload), expected_generation=generation
+            )
+        except CommandSuperseded:
+            raise
+        except Exception as exc:
+            # A failed stop acknowledgement cannot turn into a successful save
+            # or leave the UI advertising a normal, enabled motion state.
+            try:
+                self.dispatch(Command.REPORT_FAULT, {"reason": f"采集停止失败：{exc}"})
+            except Exception:
+                logging.getLogger("workbench.application").exception("Collection fault stop failed")
+            raise
+
+    def _dispatch_collection_finish(self, data, *, expected_generation=None):
+        with self._lock:
+            if expected_generation is not None and (
+                self._preemption_generation != expected_generation
+                or self._state_machine.state is not WorkflowState.ROBOT_ENABLED
+                or self._state_machine.recording_state is not RecordingState.RECORDING
+            ):
+                raise CommandSuperseded("HOME 完成后的保存已被其他操作中断")
+            self._validate_locked(Command.FINISH_COLLECTION, data)
+            previous = self._state_machine.state
+            generation = self._preemption_generation
+        stop = {
+            WorkflowState.TELEOP_RUNNING: Command.STOP_TELEOP,
+            WorkflowState.REPLAY_RUNNING: Command.STOP_TRAJECTORY_REPLAY,
+            WorkflowState.POINT_MOVE_RUNNING: Command.STOP_POINT_MOTION,
+        }.get(previous)
+        if stop is not None:
+            self._collection_stop(stop, generation)
+        result = self._dispatch_normal(Command.FINISH_EPISODE, data, expected_generation=generation)
+        return self._collection_completed(Command.FINISH_COLLECTION, previous, result, data)
 
     def _dispatch_safety(
         self,
@@ -296,9 +395,14 @@ class ApplicationService:
             )
 
     def _apply_normal_transition_locked(self, command):
-        if command in (
-            Command.STOP_TRAJECTORY_RECORDING, Command.CANCEL_TRAJECTORY_RECORDING,
-        ) and self._runtime_snapshot is not None:
+        if (
+            command
+            in (
+                Command.STOP_TRAJECTORY_RECORDING,
+                Command.CANCEL_TRAJECTORY_RECORDING,
+            )
+            and self._runtime_snapshot is not None
+        ):
             # Resolving a preempted recording must not hide the newer follow
             # session that its lease-scoped cleanup deliberately leaves running.
             if (self._runtime_snapshot() or {}).get("state") == "following":
@@ -309,8 +413,15 @@ class ApplicationService:
         self,
         command: Command,
         data: Mapping[str, Any],
+        *,
+        expected_generation=None,
     ) -> CommandResult:
         with self._lock:
+            if (
+                expected_generation is not None
+                and self._preemption_generation != expected_generation
+            ):
+                raise CommandSuperseded("采集操作已被 HOME、停止或故障中断")
             generation = self._preemption_generation
             previous_state = self._state_machine.state
             self._validate_locked(command, data)
@@ -540,8 +651,11 @@ class ApplicationService:
         details: Mapping[str, Any],
     ) -> None:
         getattr(logging.getLogger("workbench.application"), level.value)(
-            "%s [%s]: %s", kind, command.name if command is not None else "application",
-            message, exc_info=level is EventLevel.ERROR and sys.exc_info()[0] is not None,
+            "%s [%s]: %s",
+            kind,
+            command.name if command is not None else "application",
+            message,
+            exc_info=level is EventLevel.ERROR and sys.exc_info()[0] is not None,
         )
         self._event_sequence += 1
         event = AppEvent(
