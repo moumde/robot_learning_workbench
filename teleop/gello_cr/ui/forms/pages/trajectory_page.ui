@@ -2,721 +2,1293 @@
 <ui version="4.0">
  <class>TrajectoryPanel</class>
  <widget class="QWidget" name="TrajectoryPanel">
-  <property name="minimumSize">
-   <size>
-    <width>0</width>
-    <height>216</height>
-   </size>
-  </property>
   <property name="geometry">
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>640</width>
-    <height>480</height>
+    <width>1120</width>
+    <height>640</height>
    </rect>
   </property>
-  <property name="sizePolicy">
-   <sizepolicy hsizetype="Preferred" vsizetype="Preferred">
-    <horstretch>0</horstretch>
-    <verstretch>0</verstretch>
-   </sizepolicy>
+  <property name="minimumSize">
+   <size>
+    <width>0</width>
+    <height>260</height>
+   </size>
   </property>
-  <layout class="QGridLayout" name="trajectory_GridLayout_1" columnstretch="0,0" rowstretch="0,0,0,0,0">
+  <layout class="QHBoxLayout" name="trajectory_root_layout" stretch="0,1">
    <property name="leftMargin">
-    <number>6</number>
+    <number>0</number>
    </property>
    <property name="topMargin">
-    <number>6</number>
+    <number>0</number>
    </property>
    <property name="rightMargin">
-    <number>6</number>
+    <number>0</number>
    </property>
    <property name="bottomMargin">
-    <number>6</number>
+    <number>0</number>
    </property>
-   <property name="horizontalSpacing">
-    <number>4</number>
+   <property name="spacing">
+    <number>12</number>
    </property>
-   <property name="verticalSpacing">
-    <number>4</number>
-   </property>
-   <item row="0" column="0" rowspan="1" colspan="2">
-    <layout class="QHBoxLayout" name="trajectory_HBoxLayout_1" stretch="0,0,0,0,0,0">
-     <property name="leftMargin">
-      <number>0</number>
-     </property>
-     <property name="topMargin">
-      <number>0</number>
-     </property>
-     <property name="rightMargin">
-      <number>0</number>
-     </property>
-     <property name="bottomMargin">
-      <number>0</number>
-     </property>
-     <property name="spacing">
-      <number>4</number>
-     </property>
-     <item>
-      <widget class="QLabel" name="trajectory_Label_1">
-       <property name="sizePolicy">
-        <sizepolicy hsizetype="Preferred" vsizetype="Preferred">
-         <horstretch>0</horstretch>
-         <verstretch>0</verstretch>
-        </sizepolicy>
-       </property>
-       <property name="text">
-        <string>名称</string>
-       </property>
-       <property name="wordWrap">
-        <bool>false</bool>
-       </property>
-       <property name="alignment">
-        <set>Qt::AlignLeft|Qt::AlignVCenter</set>
-       </property>
-       <property name="textInteractionFlags">
-        <set>Qt::LinksAccessibleByMouse</set>
-       </property>
-      </widget>
-     </item>
-     <item>
-      <widget class="QLineEdit" name="trajectory_record_name">
-       <property name="sizePolicy">
-        <sizepolicy hsizetype="Expanding" vsizetype="Fixed">
-         <horstretch>0</horstretch>
-         <verstretch>0</verstretch>
-        </sizepolicy>
-       </property>
-       <property name="text">
-        <string />
-       </property>
-       <property name="placeholderText">
-        <string>轨迹名称，如 motor_pick_demo_01</string>
-       </property>
-      </widget>
-     </item>
-     <item>
-      <widget class="QPushButton" name="trajectory_record_button">
-       <property name="sizePolicy">
-        <sizepolicy hsizetype="Minimum" vsizetype="Fixed">
-         <horstretch>0</horstretch>
-         <verstretch>0</verstretch>
-        </sizepolicy>
-       </property>
-       <property name="text">
-        <string>开始记录</string>
-       </property>
-      </widget>
-     </item>
-     <item>
-      <widget class="QPushButton" name="trajectory_finish_button">
-       <property name="sizePolicy">
-        <sizepolicy hsizetype="Minimum" vsizetype="Fixed">
-         <horstretch>0</horstretch>
-         <verstretch>0</verstretch>
-        </sizepolicy>
-       </property>
-       <property name="text">
-        <string>停止并保存</string>
-       </property>
-      </widget>
-     </item>
-     <item>
-      <widget class="QPushButton" name="trajectory_save_button">
-       <property name="sizePolicy">
-        <sizepolicy hsizetype="Minimum" vsizetype="Fixed">
-         <horstretch>0</horstretch>
-         <verstretch>0</verstretch>
-        </sizepolicy>
-       </property>
-       <property name="text">
-        <string>重试保存</string>
-       </property>
-      </widget>
-     </item>
-     <item>
-      <widget class="QPushButton" name="trajectory_cancel_button">
-       <property name="sizePolicy">
-        <sizepolicy hsizetype="Minimum" vsizetype="Fixed">
-         <horstretch>0</horstretch>
-         <verstretch>0</verstretch>
-        </sizepolicy>
-       </property>
-       <property name="text">
-        <string>取消记录</string>
-       </property>
-      </widget>
-     </item>
-    </layout>
-   </item>
-   <item row="1" column="0" rowspan="1" colspan="2">
-    <layout class="QHBoxLayout" name="trajectory_HBoxLayout_2" stretch="0,1,0,0,0,0,0">
-     <property name="leftMargin">
-      <number>0</number>
-     </property>
-     <property name="topMargin">
-      <number>0</number>
-     </property>
-     <property name="rightMargin">
-      <number>0</number>
-     </property>
-     <property name="bottomMargin">
-      <number>0</number>
-     </property>
-     <property name="spacing">
-      <number>4</number>
-     </property>
-     <item>
-      <widget class="QLabel" name="trajectory_Label_2">
-       <property name="sizePolicy">
-        <sizepolicy hsizetype="Preferred" vsizetype="Preferred">
-         <horstretch>0</horstretch>
-         <verstretch>0</verstretch>
-        </sizepolicy>
-       </property>
-       <property name="text">
-        <string>已保存</string>
-       </property>
-       <property name="wordWrap">
-        <bool>false</bool>
-       </property>
-       <property name="alignment">
-        <set>Qt::AlignLeft|Qt::AlignVCenter</set>
-       </property>
-       <property name="textInteractionFlags">
-        <set>Qt::LinksAccessibleByMouse</set>
-       </property>
-      </widget>
-     </item>
-     <item>
-      <widget class="QComboBox" name="trajectory_saved_combo">
-       <property name="minimumSize">
-        <size>
-         <width>210</width>
-         <height>0</height>
-        </size>
-       </property>
-       <property name="sizePolicy">
-        <sizepolicy hsizetype="Preferred" vsizetype="Fixed">
-         <horstretch>0</horstretch>
-         <verstretch>0</verstretch>
-        </sizepolicy>
-       </property>
-       <property name="editable">
-        <bool>false</bool>
-       </property>
-       <property name="currentIndex">
-        <number>-1</number>
-       </property>
-      </widget>
-     </item>
-     <item>
-      <widget class="QPushButton" name="trajectory_refresh_button">
-       <property name="sizePolicy">
-        <sizepolicy hsizetype="Minimum" vsizetype="Fixed">
-         <horstretch>0</horstretch>
-         <verstretch>0</verstretch>
-        </sizepolicy>
-       </property>
-       <property name="text">
-        <string>刷新</string>
-       </property>
-      </widget>
-     </item>
-     <item>
-      <widget class="QPushButton" name="trajectory_import_json_button">
-       <property name="sizePolicy">
-        <sizepolicy hsizetype="Minimum" vsizetype="Fixed">
-         <horstretch>0</horstretch>
-         <verstretch>0</verstretch>
-        </sizepolicy>
-       </property>
-       <property name="text">
-        <string>导入旧 JSON</string>
-       </property>
-      </widget>
-     </item>
-     <item>
-      <widget class="QPushButton" name="trajectory_import_episode_button">
-       <property name="sizePolicy">
-        <sizepolicy hsizetype="Minimum" vsizetype="Fixed">
-         <horstretch>0</horstretch>
-         <verstretch>0</verstretch>
-        </sizepolicy>
-       </property>
-       <property name="text">
-        <string>导入 LeRobot</string>
-       </property>
-      </widget>
-     </item>
-     <item>
-      <widget class="QLabel" name="trajectory_Label_3">
-       <property name="sizePolicy">
-        <sizepolicy hsizetype="Preferred" vsizetype="Preferred">
-         <horstretch>0</horstretch>
-         <verstretch>0</verstretch>
-        </sizepolicy>
-       </property>
-       <property name="text">
-        <string>Episode</string>
-       </property>
-       <property name="wordWrap">
-        <bool>false</bool>
-       </property>
-       <property name="alignment">
-        <set>Qt::AlignLeft|Qt::AlignVCenter</set>
-       </property>
-       <property name="textInteractionFlags">
-        <set>Qt::LinksAccessibleByMouse</set>
-       </property>
-      </widget>
-     </item>
-     <item>
-      <widget class="QSpinBox" name="trajectory_episode_spin">
-       <property name="sizePolicy">
-        <sizepolicy hsizetype="Minimum" vsizetype="Fixed">
-         <horstretch>0</horstretch>
-         <verstretch>0</verstretch>
-        </sizepolicy>
-       </property>
-       <property name="minimum">
-        <number>0</number>
-       </property>
-       <property name="maximum">
-        <number>1000000</number>
-       </property>
-       <property name="singleStep">
-        <number>1</number>
-       </property>
-       <property name="value">
-        <number>0</number>
-       </property>
-       <property name="suffix">
-        <string />
-       </property>
-      </widget>
-     </item>
-    </layout>
-   </item>
-   <item row="2" column="0" rowspan="1" colspan="2">
-    <layout class="QHBoxLayout" name="trajectory_HBoxLayout_3" stretch="0,0,0,0,0,0,0,0,0">
-     <property name="leftMargin">
-      <number>0</number>
-     </property>
-     <property name="topMargin">
-      <number>0</number>
-     </property>
-     <property name="rightMargin">
-      <number>0</number>
-     </property>
-     <property name="bottomMargin">
-      <number>0</number>
-     </property>
-     <property name="spacing">
-      <number>4</number>
-     </property>
-     <item>
-      <widget class="QComboBox" name="trajectory_mode_combo">
-       <property name="toolTip">
-        <string>相对：从当前位置复现位移；绝对：先用 3 秒过渡到轨迹起点</string>
-       </property>
-       <property name="sizePolicy">
-        <sizepolicy hsizetype="Preferred" vsizetype="Fixed">
-         <horstretch>0</horstretch>
-         <verstretch>0</verstretch>
-        </sizepolicy>
-       </property>
-       <property name="editable">
-        <bool>false</bool>
-       </property>
-       <property name="currentIndex">
-        <number>0</number>
-       </property>
-       <item>
-        <property name="text">
-         <string>相对 Relative</string>
-        </property>
-       </item>
-       <item>
-        <property name="text">
-         <string>绝对 Absolute</string>
-        </property>
-       </item>
-      </widget>
-     </item>
-     <item>
-      <widget class="QLabel" name="trajectory_Label_4">
-       <property name="sizePolicy">
-        <sizepolicy hsizetype="Preferred" vsizetype="Preferred">
-         <horstretch>0</horstretch>
-         <verstretch>0</verstretch>
-        </sizepolicy>
-       </property>
-       <property name="text">
-        <string>速度</string>
-       </property>
-       <property name="wordWrap">
-        <bool>false</bool>
-       </property>
-       <property name="alignment">
-        <set>Qt::AlignLeft|Qt::AlignVCenter</set>
-       </property>
-       <property name="textInteractionFlags">
-        <set>Qt::LinksAccessibleByMouse</set>
-       </property>
-      </widget>
-     </item>
-     <item>
-      <widget class="QDoubleSpinBox" name="trajectory_speed_spin">
-       <property name="sizePolicy">
-        <sizepolicy hsizetype="Minimum" vsizetype="Fixed">
-         <horstretch>0</horstretch>
-         <verstretch>0</verstretch>
-        </sizepolicy>
-       </property>
-       <property name="decimals">
-        <number>2</number>
-       </property>
-       <property name="minimum">
-        <double>0.1</double>
-       </property>
-       <property name="maximum">
-        <double>2.0</double>
-       </property>
-       <property name="singleStep">
-        <double>0.1</double>
-       </property>
-       <property name="value">
-        <double>1.0</double>
-       </property>
-       <property name="suffix">
-        <string>×</string>
-       </property>
-      </widget>
-     </item>
-     <item>
-      <widget class="QLabel" name="trajectory_Label_5">
-       <property name="sizePolicy">
-        <sizepolicy hsizetype="Preferred" vsizetype="Preferred">
-         <horstretch>0</horstretch>
-         <verstretch>0</verstretch>
-        </sizepolicy>
-       </property>
-       <property name="text">
-        <string>次数</string>
-       </property>
-       <property name="wordWrap">
-        <bool>false</bool>
-       </property>
-       <property name="alignment">
-        <set>Qt::AlignLeft|Qt::AlignVCenter</set>
-       </property>
-       <property name="textInteractionFlags">
-        <set>Qt::LinksAccessibleByMouse</set>
-       </property>
-      </widget>
-     </item>
-     <item>
-      <widget class="QSpinBox" name="trajectory_repeat_spin">
-       <property name="sizePolicy">
-        <sizepolicy hsizetype="Minimum" vsizetype="Fixed">
-         <horstretch>0</horstretch>
-         <verstretch>0</verstretch>
-        </sizepolicy>
-       </property>
-       <property name="minimum">
-        <number>1</number>
-       </property>
-       <property name="maximum">
-        <number>1000</number>
-       </property>
-       <property name="singleStep">
-        <number>1</number>
-       </property>
-       <property name="value">
-        <number>1</number>
-       </property>
-       <property name="suffix">
-        <string />
-       </property>
-      </widget>
-     </item>
-     <item>
-      <widget class="QCheckBox" name="trajectory_arm_check">
-       <property name="sizePolicy">
-        <sizepolicy hsizetype="Minimum" vsizetype="Fixed">
-         <horstretch>0</horstretch>
-         <verstretch>0</verstretch>
-        </sizepolicy>
-       </property>
-       <property name="text">
-        <string>Arm</string>
-       </property>
-       <property name="checkable">
-        <bool>true</bool>
-       </property>
-       <property name="checked">
-        <bool>true</bool>
-       </property>
-      </widget>
-     </item>
-     <item>
-      <widget class="QCheckBox" name="trajectory_hand_check">
-       <property name="sizePolicy">
-        <sizepolicy hsizetype="Minimum" vsizetype="Fixed">
-         <horstretch>0</horstretch>
-         <verstretch>0</verstretch>
-        </sizepolicy>
-       </property>
-       <property name="text">
-        <string>Hand</string>
-       </property>
-       <property name="checkable">
-        <bool>true</bool>
-       </property>
-       <property name="checked">
-        <bool>true</bool>
-       </property>
-      </widget>
-     </item>
-     <item>
-      <widget class="QPushButton" name="trajectory_preview_button">
-       <property name="sizePolicy">
-        <sizepolicy hsizetype="Minimum" vsizetype="Fixed">
-         <horstretch>0</horstretch>
-         <verstretch>0</verstretch>
-        </sizepolicy>
-       </property>
-       <property name="text">
-        <string>预览</string>
-       </property>
-      </widget>
-     </item>
-     <item>
-      <widget class="QPushButton" name="trajectory_play_button">
-       <property name="sizePolicy">
-        <sizepolicy hsizetype="Minimum" vsizetype="Fixed">
-         <horstretch>0</horstretch>
-         <verstretch>0</verstretch>
-        </sizepolicy>
-       </property>
-       <property name="text">
-        <string>回放</string>
-       </property>
-      </widget>
-     </item>
-    </layout>
-   </item>
-   <item row="3" column="0" rowspan="1" colspan="2">
-    <layout class="QHBoxLayout" name="trajectory_HBoxLayout_4" stretch="0,0,0,0,0,0,0,1">
-     <property name="leftMargin">
-      <number>0</number>
-     </property>
-     <property name="topMargin">
-      <number>0</number>
-     </property>
-     <property name="rightMargin">
-      <number>0</number>
-     </property>
-     <property name="bottomMargin">
-      <number>0</number>
-     </property>
-     <property name="spacing">
-      <number>4</number>
-     </property>
-     <item>
-      <widget class="QLabel" name="trajectory_Label_6">
-       <property name="sizePolicy">
-        <sizepolicy hsizetype="Preferred" vsizetype="Preferred">
-         <horstretch>0</horstretch>
-         <verstretch>0</verstretch>
-        </sizepolicy>
-       </property>
-       <property name="text">
-        <string>回放关节</string>
-       </property>
-       <property name="wordWrap">
-        <bool>false</bool>
-       </property>
-       <property name="alignment">
-        <set>Qt::AlignLeft|Qt::AlignVCenter</set>
-       </property>
-       <property name="textInteractionFlags">
-        <set>Qt::LinksAccessibleByMouse</set>
-       </property>
-      </widget>
-     </item>
-     <item>
-      <widget class="QCheckBox" name="trajectory_joint_checks_0">
-       <property name="sizePolicy">
-        <sizepolicy hsizetype="Minimum" vsizetype="Fixed">
-         <horstretch>0</horstretch>
-         <verstretch>0</verstretch>
-        </sizepolicy>
-       </property>
-       <property name="text">
-        <string>J1</string>
-       </property>
-       <property name="checkable">
-        <bool>true</bool>
-       </property>
-       <property name="checked">
-        <bool>true</bool>
-       </property>
-      </widget>
-     </item>
-     <item>
-      <widget class="QCheckBox" name="trajectory_joint_checks_1">
-       <property name="sizePolicy">
-        <sizepolicy hsizetype="Minimum" vsizetype="Fixed">
-         <horstretch>0</horstretch>
-         <verstretch>0</verstretch>
-        </sizepolicy>
-       </property>
-       <property name="text">
-        <string>J2</string>
-       </property>
-       <property name="checkable">
-        <bool>true</bool>
-       </property>
-       <property name="checked">
-        <bool>true</bool>
-       </property>
-      </widget>
-     </item>
-     <item>
-      <widget class="QCheckBox" name="trajectory_joint_checks_2">
-       <property name="sizePolicy">
-        <sizepolicy hsizetype="Minimum" vsizetype="Fixed">
-         <horstretch>0</horstretch>
-         <verstretch>0</verstretch>
-        </sizepolicy>
-       </property>
-       <property name="text">
-        <string>J3</string>
-       </property>
-       <property name="checkable">
-        <bool>true</bool>
-       </property>
-       <property name="checked">
-        <bool>true</bool>
-       </property>
-      </widget>
-     </item>
-     <item>
-      <widget class="QCheckBox" name="trajectory_joint_checks_3">
-       <property name="sizePolicy">
-        <sizepolicy hsizetype="Minimum" vsizetype="Fixed">
-         <horstretch>0</horstretch>
-         <verstretch>0</verstretch>
-        </sizepolicy>
-       </property>
-       <property name="text">
-        <string>J4</string>
-       </property>
-       <property name="checkable">
-        <bool>true</bool>
-       </property>
-       <property name="checked">
-        <bool>true</bool>
-       </property>
-      </widget>
-     </item>
-     <item>
-      <widget class="QCheckBox" name="trajectory_joint_checks_4">
-       <property name="sizePolicy">
-        <sizepolicy hsizetype="Minimum" vsizetype="Fixed">
-         <horstretch>0</horstretch>
-         <verstretch>0</verstretch>
-        </sizepolicy>
-       </property>
-       <property name="text">
-        <string>J5</string>
-       </property>
-       <property name="checkable">
-        <bool>true</bool>
-       </property>
-       <property name="checked">
-        <bool>true</bool>
-       </property>
-      </widget>
-     </item>
-     <item>
-      <widget class="QCheckBox" name="trajectory_joint_checks_5">
-       <property name="sizePolicy">
-        <sizepolicy hsizetype="Minimum" vsizetype="Fixed">
-         <horstretch>0</horstretch>
-         <verstretch>0</verstretch>
-        </sizepolicy>
-       </property>
-       <property name="text">
-        <string>J6</string>
-       </property>
-       <property name="checkable">
-        <bool>true</bool>
-       </property>
-       <property name="checked">
-        <bool>true</bool>
-       </property>
-      </widget>
-     </item>
-     <item>
-      <widget class="QLabel" name="trajectory_status_label">
-       <property name="sizePolicy">
-        <sizepolicy hsizetype="Preferred" vsizetype="Preferred">
-         <horstretch>0</horstretch>
-         <verstretch>0</verstretch>
-        </sizepolicy>
-       </property>
-       <property name="text">
-        <string>未录制</string>
-       </property>
-       <property name="wordWrap">
-        <bool>false</bool>
-       </property>
-       <property name="alignment">
-        <set>Qt::AlignLeft|Qt::AlignVCenter</set>
-       </property>
-       <property name="textInteractionFlags">
-        <set>Qt::LinksAccessibleByMouse</set>
-       </property>
-      </widget>
-     </item>
-    </layout>
-   </item>
-   <item row="4" column="0" rowspan="1" colspan="2">
-    <widget class="QPlainTextEdit" name="trajectory_preview_text">
+   <item>
+    <widget class="QFrame" name="trajectory_library_panel">
      <property name="minimumSize">
       <size>
-       <width>0</width>
-       <height>64</height>
+       <width>212</width>
+       <height>0</height>
       </size>
      </property>
      <property name="maximumSize">
       <size>
-       <width>16777215</width>
-       <height>92</height>
+       <width>280</width>
+       <height>16777215</height>
       </size>
      </property>
-     <property name="sizePolicy">
-      <sizepolicy hsizetype="Expanding" vsizetype="Expanding">
-       <horstretch>0</horstretch>
-       <verstretch>0</verstretch>
-      </sizepolicy>
+     <property name="role" stdset="0">
+      <string>surfacePanel</string>
      </property>
-     <property name="readOnly">
-      <bool>true</bool>
-     </property>
-     <property name="placeholderText">
-      <string>选择轨迹后点击预览：时长、关节范围与速度、TCP 和 Hand 范围</string>
-     </property>
+     <layout class="QVBoxLayout" name="trajectory_library_layout">
+      <property name="leftMargin">
+       <number>12</number>
+      </property>
+      <property name="topMargin">
+       <number>12</number>
+      </property>
+      <property name="rightMargin">
+       <number>12</number>
+      </property>
+      <property name="bottomMargin">
+       <number>12</number>
+      </property>
+      <property name="spacing">
+       <number>10</number>
+      </property>
+      <item>
+       <layout class="QHBoxLayout" name="trajectory_library_header" stretch="1,0">
+        <property name="leftMargin">
+         <number>0</number>
+        </property>
+        <property name="topMargin">
+         <number>0</number>
+        </property>
+        <property name="rightMargin">
+         <number>0</number>
+        </property>
+        <property name="bottomMargin">
+         <number>0</number>
+        </property>
+        <property name="spacing">
+         <number>10</number>
+        </property>
+        <item>
+         <widget class="QLabel" name="trajectory_library_title">
+          <property name="text">
+           <string>轨迹库</string>
+          </property>
+          <property name="wordWrap">
+           <bool>true</bool>
+          </property>
+          <property name="role" stdset="0">
+           <string>sectionTitle</string>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QPushButton" name="trajectory_refresh_button">
+          <property name="text">
+           <string>刷新</string>
+          </property>
+          <property name="role" stdset="0">
+           <string>quiet</string>
+          </property>
+         </widget>
+        </item>
+       </layout>
+      </item>
+      <item>
+       <widget class="QLabel" name="trajectory_library_count">
+        <property name="text">
+         <string>0 条轨迹</string>
+        </property>
+        <property name="wordWrap">
+         <bool>true</bool>
+        </property>
+        <property name="role" stdset="0">
+         <string>mutedText</string>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QListWidget" name="trajectory_saved_list">
+        <property name="role" stdset="0">
+         <string>trajectoryLibrary</string>
+        </property>
+        <property name="wordWrap">
+         <bool>true</bool>
+        </property>
+        <property name="selectionMode">
+         <enum>QAbstractItemView::SingleSelection</enum>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QGroupBox" name="trajectory_import_group">
+        <property name="title">
+         <string>导入轨迹</string>
+        </property>
+        <layout class="QVBoxLayout" name="trajectory_import_layout">
+         <property name="leftMargin">
+          <number>8</number>
+         </property>
+         <property name="topMargin">
+          <number>8</number>
+         </property>
+         <property name="rightMargin">
+          <number>8</number>
+         </property>
+         <property name="bottomMargin">
+          <number>8</number>
+         </property>
+         <property name="spacing">
+          <number>8</number>
+         </property>
+         <item>
+          <widget class="QPushButton" name="trajectory_import_json_button">
+           <property name="text">
+            <string>导入旧 JSON</string>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <layout class="QHBoxLayout" name="trajectory_episode_row">
+           <property name="leftMargin">
+            <number>0</number>
+           </property>
+           <property name="topMargin">
+            <number>0</number>
+           </property>
+           <property name="rightMargin">
+            <number>0</number>
+           </property>
+           <property name="bottomMargin">
+            <number>0</number>
+           </property>
+           <property name="spacing">
+            <number>10</number>
+           </property>
+           <item>
+            <widget class="QLabel" name="trajectory_episode_label">
+             <property name="text">
+              <string>Episode</string>
+             </property>
+             <property name="wordWrap">
+              <bool>true</bool>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QSpinBox" name="trajectory_episode_spin">
+             <property name="maximum">
+              <number>1000000</number>
+             </property>
+             <property name="toolTip">
+              <string>选择要从 LeRobot 数据集导入的 Episode 索引</string>
+             </property>
+            </widget>
+           </item>
+          </layout>
+         </item>
+         <item>
+          <widget class="QPushButton" name="trajectory_import_episode_button">
+           <property name="text">
+            <string>导入 LeRobot Episode</string>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QLabel" name="trajectory_import_hint">
+           <property name="text">
+            <string>导入后在库中选择，再预览轨迹。</string>
+           </property>
+           <property name="wordWrap">
+            <bool>true</bool>
+           </property>
+           <property name="role" stdset="0">
+            <string>mutedText</string>
+           </property>
+          </widget>
+         </item>
+        </layout>
+       </widget>
+      </item>
+     </layout>
+    </widget>
+   </item>
+   <item>
+    <widget class="QWidget" name="trajectory_workspace">
+     <layout class="QVBoxLayout" name="trajectory_workspace_layout" stretch="1,0">
+      <property name="leftMargin">
+       <number>0</number>
+      </property>
+      <property name="topMargin">
+       <number>0</number>
+      </property>
+      <property name="rightMargin">
+       <number>0</number>
+      </property>
+      <property name="bottomMargin">
+       <number>0</number>
+      </property>
+      <property name="spacing">
+       <number>12</number>
+      </property>
+      <item>
+       <widget class="QScrollArea" name="trajectory_content_scroll">
+        <property name="widgetResizable">
+         <bool>true</bool>
+        </property>
+        <property name="frameShape">
+         <enum>QFrame::NoFrame</enum>
+        </property>
+        <property name="horizontalScrollBarPolicy">
+         <enum>Qt::ScrollBarAsNeeded</enum>
+        </property>
+        <widget class="QWidget" name="trajectory_content">
+         <property name="geometry">
+          <rect>
+           <x>0</x>
+           <y>0</y>
+           <width>860</width>
+           <height>520</height>
+          </rect>
+         </property>
+         <layout class="QHBoxLayout" name="trajectory_content_layout" stretch="1,0">
+          <property name="leftMargin">
+           <number>0</number>
+          </property>
+          <property name="topMargin">
+           <number>0</number>
+          </property>
+          <property name="rightMargin">
+           <number>0</number>
+          </property>
+          <property name="bottomMargin">
+           <number>0</number>
+          </property>
+          <property name="spacing">
+           <number>12</number>
+          </property>
+          <item>
+           <widget class="QStackedWidget" name="trajectory_center_stack">
+            <property name="currentIndex">
+             <number>1</number>
+            </property>
+            <widget class="QFrame" name="trajectory_record_center">
+             <property name="role" stdset="0">
+              <string>surfacePanel</string>
+             </property>
+             <layout class="QVBoxLayout" name="trajectory_record_center_layout">
+              <property name="leftMargin">
+               <number>18</number>
+              </property>
+              <property name="topMargin">
+               <number>18</number>
+              </property>
+              <property name="rightMargin">
+               <number>18</number>
+              </property>
+              <property name="bottomMargin">
+               <number>18</number>
+              </property>
+              <property name="spacing">
+               <number>16</number>
+              </property>
+              <item>
+               <widget class="QLabel" name="trajectory_record_title">
+                <property name="text">
+                 <string>录制工作区</string>
+                </property>
+                <property name="wordWrap">
+                 <bool>true</bool>
+                </property>
+                <property name="role" stdset="0">
+                 <string>sectionTitle</string>
+                </property>
+               </widget>
+              </item>
+              <item>
+               <widget class="QLabel" name="trajectory_record_indicator">
+                <property name="text">
+                 <string>REC · 准备录制</string>
+                </property>
+                <property name="wordWrap">
+                 <bool>true</bool>
+                </property>
+                <property name="role" stdset="0">
+                 <string>metricValue</string>
+                </property>
+               </widget>
+              </item>
+              <item>
+               <widget class="QLabel" name="trajectory_status_label">
+                <property name="text">
+                 <string>未录制 · 0 帧 · 0.00 s</string>
+                </property>
+                <property name="wordWrap">
+                 <bool>true</bool>
+                </property>
+                <property name="role" stdset="0">
+                 <string>stateHeadline</string>
+                </property>
+               </widget>
+              </item>
+              <item>
+               <layout class="QHBoxLayout" name="trajectory_record_metrics" stretch="1,1">
+                <property name="leftMargin">
+                 <number>0</number>
+                </property>
+                <property name="topMargin">
+                 <number>0</number>
+                </property>
+                <property name="rightMargin">
+                 <number>0</number>
+                </property>
+                <property name="bottomMargin">
+                 <number>0</number>
+                </property>
+                <property name="spacing">
+                 <number>10</number>
+                </property>
+                <item>
+                 <widget class="QWidget" name="trajectory_frames_metric">
+                  <layout class="QVBoxLayout" name="trajectory_frames_layout">
+                   <property name="leftMargin">
+                    <number>0</number>
+                   </property>
+                   <property name="topMargin">
+                    <number>0</number>
+                   </property>
+                   <property name="rightMargin">
+                    <number>0</number>
+                   </property>
+                   <property name="bottomMargin">
+                    <number>0</number>
+                   </property>
+                   <property name="spacing">
+                    <number>4</number>
+                   </property>
+                   <item>
+                    <widget class="QLabel" name="trajectory_frames_label">
+                     <property name="text">
+                      <string>已采集帧数</string>
+                     </property>
+                     <property name="wordWrap">
+                      <bool>true</bool>
+                     </property>
+                     <property name="role" stdset="0">
+                      <string>metricLabel</string>
+                     </property>
+                    </widget>
+                   </item>
+                   <item>
+                    <widget class="QLabel" name="trajectory_frames_value">
+                     <property name="text">
+                      <string>—</string>
+                     </property>
+                     <property name="wordWrap">
+                      <bool>true</bool>
+                     </property>
+                     <property name="role" stdset="0">
+                      <string>metricValue</string>
+                     </property>
+                    </widget>
+                   </item>
+                  </layout>
+                 </widget>
+                </item>
+                <item>
+                 <widget class="QWidget" name="trajectory_elapsed_metric">
+                  <layout class="QVBoxLayout" name="trajectory_elapsed_layout">
+                   <property name="leftMargin">
+                    <number>0</number>
+                   </property>
+                   <property name="topMargin">
+                    <number>0</number>
+                   </property>
+                   <property name="rightMargin">
+                    <number>0</number>
+                   </property>
+                   <property name="bottomMargin">
+                    <number>0</number>
+                   </property>
+                   <property name="spacing">
+                    <number>4</number>
+                   </property>
+                   <item>
+                    <widget class="QLabel" name="trajectory_elapsed_label">
+                     <property name="text">
+                      <string>录制时长</string>
+                     </property>
+                     <property name="wordWrap">
+                      <bool>true</bool>
+                     </property>
+                     <property name="role" stdset="0">
+                      <string>metricLabel</string>
+                     </property>
+                    </widget>
+                   </item>
+                   <item>
+                    <widget class="QLabel" name="trajectory_elapsed_value">
+                     <property name="text">
+                      <string>—</string>
+                     </property>
+                     <property name="wordWrap">
+                      <bool>true</bool>
+                     </property>
+                     <property name="role" stdset="0">
+                      <string>metricValue</string>
+                     </property>
+                    </widget>
+                   </item>
+                  </layout>
+                 </widget>
+                </item>
+               </layout>
+              </item>
+              <item>
+               <widget class="QLabel" name="trajectory_record_context">
+                <property name="text">
+                 <string>输入名称后开始记录。采集当前控制流程中的机器人与 Hand 状态或指令。</string>
+                </property>
+                <property name="wordWrap">
+                 <bool>true</bool>
+                </property>
+                <property name="role" stdset="0">
+                 <string>mutedText</string>
+                </property>
+               </widget>
+              </item>
+              <item>
+               <widget class="QLabel" name="trajectory_record_guidance">
+                <property name="text">
+                 <string>录制期间可继续操作遥操。完成后点击“停止并保存”；保存失败时可重试，或取消本次记录。</string>
+                </property>
+                <property name="wordWrap">
+                 <bool>true</bool>
+                </property>
+                <property name="role" stdset="0">
+                 <string>mutedText</string>
+                </property>
+               </widget>
+              </item>
+              <item>
+               <spacer name="trajectory_record_space">
+                <property name="orientation">
+                 <enum>Qt::Vertical</enum>
+                </property>
+                <property name="sizeHint">
+                 <size>
+                  <width>20</width>
+                  <height>20</height>
+                 </size>
+                </property>
+               </spacer>
+              </item>
+             </layout>
+            </widget>
+            <widget class="QFrame" name="trajectory_replay_center">
+             <property name="role" stdset="0">
+              <string>surfacePanel</string>
+             </property>
+             <layout class="QVBoxLayout" name="trajectory_replay_center_layout" stretch="0,0,0,1">
+              <property name="leftMargin">
+               <number>14</number>
+              </property>
+              <property name="topMargin">
+               <number>14</number>
+              </property>
+              <property name="rightMargin">
+               <number>14</number>
+              </property>
+              <property name="bottomMargin">
+               <number>14</number>
+              </property>
+              <property name="spacing">
+               <number>10</number>
+              </property>
+              <item>
+               <widget class="QLabel" name="trajectory_preview_summary">
+                <property name="text">
+                 <string>选择轨迹以查看预览</string>
+                </property>
+                <property name="wordWrap">
+                 <bool>true</bool>
+                </property>
+                <property name="role" stdset="0">
+                 <string>sectionTitle</string>
+                </property>
+               </widget>
+              </item>
+              <item>
+               <widget class="QLabel" name="trajectory_preview_hint">
+                <property name="text">
+                 <string>从左侧轨迹库选择一条轨迹，然后点击“读取预览”。</string>
+                </property>
+                <property name="wordWrap">
+                 <bool>true</bool>
+                </property>
+                <property name="role" stdset="0">
+                 <string>mutedText</string>
+                </property>
+               </widget>
+              </item>
+              <item>
+               <widget class="QLabel" name="trajectory_preview_warnings">
+                <property name="text">
+                 <string />
+                </property>
+                <property name="wordWrap">
+                 <bool>true</bool>
+                </property>
+                <property name="role" stdset="0">
+                 <string>stateHeadline</string>
+                </property>
+               </widget>
+              </item>
+              <item>
+               <widget class="QTabWidget" name="trajectory_preview_tabs">
+                <property name="currentIndex">
+                 <number>0</number>
+                </property>
+                <widget class="QWidget" name="trajectory_preview_overview">
+                 <attribute name="title">
+                  <string>关节对比</string>
+                 </attribute>
+                 <layout class="QVBoxLayout" name="trajectory_overview_layout">
+                  <property name="leftMargin">
+                   <number>4</number>
+                  </property>
+                  <property name="topMargin">
+                   <number>4</number>
+                  </property>
+                  <property name="rightMargin">
+                   <number>4</number>
+                  </property>
+                  <property name="bottomMargin">
+                   <number>4</number>
+                  </property>
+                  <property name="spacing">
+                   <number>8</number>
+                  </property>
+                  <item>
+                   <widget class="QTableWidget" name="trajectory_joint_table">
+                    <property name="rowCount">
+                     <number>6</number>
+                    </property>
+                    <property name="columnCount">
+                     <number>5</number>
+                    </property>
+                    <property name="alternatingRowColors">
+                     <bool>true</bool>
+                    </property>
+                    <property name="minimumSize">
+                     <size>
+                      <width>0</width>
+                      <height>236</height>
+                     </size>
+                    </property>
+                    <property name="editTriggers">
+                     <set>QAbstractItemView::NoEditTriggers</set>
+                    </property>
+                    <property name="selectionMode">
+                     <enum>QAbstractItemView::NoSelection</enum>
+                    </property>
+                    <property name="focusPolicy">
+                     <enum>Qt::NoFocus</enum>
+                    </property>
+                    <row>
+                     <property name="text">
+                      <string>J1</string>
+                     </property>
+                    </row>
+                    <row>
+                     <property name="text">
+                      <string>J2</string>
+                     </property>
+                    </row>
+                    <row>
+                     <property name="text">
+                      <string>J3</string>
+                     </property>
+                    </row>
+                    <row>
+                     <property name="text">
+                      <string>J4</string>
+                     </property>
+                    </row>
+                    <row>
+                     <property name="text">
+                      <string>J5</string>
+                     </property>
+                    </row>
+                    <row>
+                     <property name="text">
+                      <string>J6</string>
+                     </property>
+                    </row>
+                    <column>
+                     <property name="text">
+                      <string>起点 (°)</string>
+                     </property>
+                    </column>
+                    <column>
+                     <property name="text">
+                      <string>终点 (°)</string>
+                     </property>
+                    </column>
+                    <column>
+                     <property name="text">
+                      <string>范围 (°)</string>
+                     </property>
+                    </column>
+                    <column>
+                     <property name="text">
+                      <string>峰值速度 (°/s)</string>
+                     </property>
+                    </column>
+                    <column>
+                     <property name="text">
+                      <string>最大步长 (°)</string>
+                     </property>
+                    </column>
+                   </widget>
+                  </item>
+                  <item>
+                   <widget class="QLabel" name="trajectory_tcp_hand_info">
+                    <property name="text">
+                     <string>TCP / Hand：读取预览后显示可用范围。</string>
+                    </property>
+                    <property name="wordWrap">
+                     <bool>true</bool>
+                    </property>
+                    <property name="role" stdset="0">
+                     <string>mutedText</string>
+                    </property>
+                   </widget>
+                  </item>
+                 </layout>
+                </widget>
+                <widget class="QWidget" name="trajectory_preview_details">
+                 <attribute name="title">
+                  <string>只读详情</string>
+                 </attribute>
+                 <layout class="QVBoxLayout" name="trajectory_details_layout">
+                  <property name="leftMargin">
+                   <number>4</number>
+                  </property>
+                  <property name="topMargin">
+                   <number>4</number>
+                  </property>
+                  <property name="rightMargin">
+                   <number>4</number>
+                  </property>
+                  <property name="bottomMargin">
+                   <number>4</number>
+                  </property>
+                  <property name="spacing">
+                   <number>10</number>
+                  </property>
+                  <item>
+                   <widget class="QPlainTextEdit" name="trajectory_preview_text">
+                    <property name="readOnly">
+                     <bool>true</bool>
+                    </property>
+                    <property name="placeholderText">
+                     <string>读取预览后显示原始单位的详细统计与警告。</string>
+                    </property>
+                   </widget>
+                  </item>
+                 </layout>
+                </widget>
+               </widget>
+              </item>
+             </layout>
+            </widget>
+           </widget>
+          </item>
+          <item>
+           <widget class="QStackedWidget" name="trajectory_parameters_stack">
+            <property name="currentIndex">
+             <number>1</number>
+            </property>
+            <property name="minimumSize">
+             <size>
+              <width>210</width>
+              <height>0</height>
+             </size>
+            </property>
+            <property name="maximumSize">
+             <size>
+              <width>244</width>
+              <height>16777215</height>
+             </size>
+            </property>
+            <widget class="QFrame" name="trajectory_record_parameters">
+             <property name="role" stdset="0">
+              <string>surfacePanel</string>
+             </property>
+             <layout class="QVBoxLayout" name="trajectory_record_parameters_layout">
+              <property name="leftMargin">
+               <number>14</number>
+              </property>
+              <property name="topMargin">
+               <number>14</number>
+              </property>
+              <property name="rightMargin">
+               <number>14</number>
+              </property>
+              <property name="bottomMargin">
+               <number>14</number>
+              </property>
+              <property name="spacing">
+               <number>12</number>
+              </property>
+              <item>
+               <widget class="QLabel" name="trajectory_record_parameters_title">
+                <property name="text">
+                 <string>录制参数</string>
+                </property>
+                <property name="wordWrap">
+                 <bool>true</bool>
+                </property>
+                <property name="role" stdset="0">
+                 <string>sectionTitle</string>
+                </property>
+               </widget>
+              </item>
+              <item>
+               <widget class="QLabel" name="trajectory_record_name_label">
+                <property name="text">
+                 <string>轨迹名称</string>
+                </property>
+                <property name="wordWrap">
+                 <bool>true</bool>
+                </property>
+               </widget>
+              </item>
+              <item>
+               <widget class="QLineEdit" name="trajectory_record_name">
+                <property name="placeholderText">
+                 <string>例如 motor_pick_demo_01</string>
+                </property>
+               </widget>
+              </item>
+              <item>
+               <widget class="QLabel" name="trajectory_record_name_hint">
+                <property name="text">
+                 <string>名称用于在轨迹库中识别本次记录。开始后名称将锁定。</string>
+                </property>
+                <property name="wordWrap">
+                 <bool>true</bool>
+                </property>
+                <property name="role" stdset="0">
+                 <string>mutedText</string>
+                </property>
+               </widget>
+              </item>
+              <item>
+               <spacer name="trajectory_record_parameters_space">
+                <property name="orientation">
+                 <enum>Qt::Vertical</enum>
+                </property>
+                <property name="sizeHint">
+                 <size>
+                  <width>20</width>
+                  <height>20</height>
+                 </size>
+                </property>
+               </spacer>
+              </item>
+             </layout>
+            </widget>
+            <widget class="QFrame" name="trajectory_replay_parameters">
+             <property name="role" stdset="0">
+              <string>surfacePanel</string>
+             </property>
+             <layout class="QVBoxLayout" name="trajectory_replay_parameters_layout">
+              <property name="leftMargin">
+               <number>14</number>
+              </property>
+              <property name="topMargin">
+               <number>14</number>
+              </property>
+              <property name="rightMargin">
+               <number>14</number>
+              </property>
+              <property name="bottomMargin">
+               <number>14</number>
+              </property>
+              <property name="spacing">
+               <number>12</number>
+              </property>
+              <item>
+               <widget class="QLabel" name="trajectory_replay_parameters_title">
+                <property name="text">
+                 <string>回放参数</string>
+                </property>
+                <property name="wordWrap">
+                 <bool>true</bool>
+                </property>
+                <property name="role" stdset="0">
+                 <string>sectionTitle</string>
+                </property>
+               </widget>
+              </item>
+              <item>
+               <widget class="QLabel" name="trajectory_mode_label">
+                <property name="text">
+                 <string>定位模式</string>
+                </property>
+                <property name="wordWrap">
+                 <bool>true</bool>
+                </property>
+               </widget>
+              </item>
+              <item>
+               <widget class="QComboBox" name="trajectory_mode_combo">
+                <property name="toolTip">
+                 <string>相对：从当前位置复现位移；绝对：先用 3 秒过渡到轨迹起点</string>
+                </property>
+                <item>
+                 <property name="text">
+                  <string>相对 Relative</string>
+                 </property>
+                </item>
+                <item>
+                 <property name="text">
+                  <string>绝对 Absolute</string>
+                 </property>
+                </item>
+               </widget>
+              </item>
+              <item>
+               <widget class="QLabel" name="trajectory_mode_hint">
+                <property name="text">
+                 <string>相对：复现位移
+绝对：用 3 秒过渡至起点</string>
+                </property>
+                <property name="wordWrap">
+                 <bool>true</bool>
+                </property>
+                <property name="role" stdset="0">
+                 <string>mutedText</string>
+                </property>
+               </widget>
+              </item>
+              <item>
+               <layout class="QFormLayout" name="trajectory_replay_values">
+                <property name="leftMargin">
+                 <number>0</number>
+                </property>
+                <property name="topMargin">
+                 <number>0</number>
+                </property>
+                <property name="rightMargin">
+                 <number>0</number>
+                </property>
+                <property name="bottomMargin">
+                 <number>0</number>
+                </property>
+                <property name="spacing">
+                 <number>8</number>
+                </property>
+                <item row="0" column="0">
+                 <widget class="QLabel" name="trajectory_speed_label">
+                  <property name="text">
+                   <string>速度倍率</string>
+                  </property>
+                 </widget>
+                </item>
+                <item row="0" column="1">
+                 <widget class="QDoubleSpinBox" name="trajectory_speed_spin">
+                  <property name="decimals">
+                   <number>2</number>
+                  </property>
+                  <property name="minimum">
+                   <double>0.1</double>
+                  </property>
+                  <property name="maximum">
+                   <double>2.0</double>
+                  </property>
+                  <property name="singleStep">
+                   <double>0.1</double>
+                  </property>
+                  <property name="value">
+                   <double>1.0</double>
+                  </property>
+                  <property name="suffix">
+                   <string>×</string>
+                  </property>
+                 </widget>
+                </item>
+                <item row="1" column="0">
+                 <widget class="QLabel" name="trajectory_repeat_label">
+                  <property name="text">
+                   <string>重复次数</string>
+                  </property>
+                 </widget>
+                </item>
+                <item row="1" column="1">
+                 <widget class="QSpinBox" name="trajectory_repeat_spin">
+                  <property name="minimum">
+                   <number>1</number>
+                  </property>
+                  <property name="maximum">
+                   <number>1000</number>
+                  </property>
+                  <property name="value">
+                   <number>1</number>
+                  </property>
+                 </widget>
+                </item>
+               </layout>
+              </item>
+              <item>
+               <widget class="QLabel" name="trajectory_channels_label">
+                <property name="text">
+                 <string>回放通道</string>
+                </property>
+                <property name="wordWrap">
+                 <bool>true</bool>
+                </property>
+               </widget>
+              </item>
+              <item>
+               <layout class="QHBoxLayout" name="trajectory_channels_layout">
+                <property name="leftMargin">
+                 <number>0</number>
+                </property>
+                <property name="topMargin">
+                 <number>0</number>
+                </property>
+                <property name="rightMargin">
+                 <number>0</number>
+                </property>
+                <property name="bottomMargin">
+                 <number>0</number>
+                </property>
+                <property name="spacing">
+                 <number>10</number>
+                </property>
+                <item>
+                 <widget class="QCheckBox" name="trajectory_arm_check">
+                  <property name="text">
+                   <string>Arm</string>
+                  </property>
+                  <property name="checked">
+                   <bool>true</bool>
+                  </property>
+                 </widget>
+                </item>
+                <item>
+                 <widget class="QCheckBox" name="trajectory_hand_check">
+                  <property name="text">
+                   <string>Hand</string>
+                  </property>
+                  <property name="checked">
+                   <bool>true</bool>
+                  </property>
+                 </widget>
+                </item>
+               </layout>
+              </item>
+              <item>
+               <widget class="QGroupBox" name="trajectory_joint_group">
+                <property name="title">
+                 <string>关节掩码（高级）</string>
+                </property>
+                <layout class="QGridLayout" name="trajectory_joint_layout">
+                 <property name="leftMargin">
+                  <number>8</number>
+                 </property>
+                 <property name="topMargin">
+                  <number>8</number>
+                 </property>
+                 <property name="rightMargin">
+                  <number>8</number>
+                 </property>
+                 <property name="bottomMargin">
+                  <number>8</number>
+                 </property>
+                 <property name="spacing">
+                  <number>8</number>
+                 </property>
+                 <item row="0" column="0">
+                  <widget class="QCheckBox" name="trajectory_joint_checks_0">
+                   <property name="text">
+                    <string>J1</string>
+                   </property>
+                   <property name="checked">
+                    <bool>true</bool>
+                   </property>
+                  </widget>
+                 </item>
+                 <item row="0" column="1">
+                  <widget class="QCheckBox" name="trajectory_joint_checks_1">
+                   <property name="text">
+                    <string>J2</string>
+                   </property>
+                   <property name="checked">
+                    <bool>true</bool>
+                   </property>
+                  </widget>
+                 </item>
+                 <item row="0" column="2">
+                  <widget class="QCheckBox" name="trajectory_joint_checks_2">
+                   <property name="text">
+                    <string>J3</string>
+                   </property>
+                   <property name="checked">
+                    <bool>true</bool>
+                   </property>
+                  </widget>
+                 </item>
+                 <item row="1" column="0">
+                  <widget class="QCheckBox" name="trajectory_joint_checks_3">
+                   <property name="text">
+                    <string>J4</string>
+                   </property>
+                   <property name="checked">
+                    <bool>true</bool>
+                   </property>
+                  </widget>
+                 </item>
+                 <item row="1" column="1">
+                  <widget class="QCheckBox" name="trajectory_joint_checks_4">
+                   <property name="text">
+                    <string>J5</string>
+                   </property>
+                   <property name="checked">
+                    <bool>true</bool>
+                   </property>
+                  </widget>
+                 </item>
+                 <item row="1" column="2">
+                  <widget class="QCheckBox" name="trajectory_joint_checks_5">
+                   <property name="text">
+                    <string>J6</string>
+                   </property>
+                   <property name="checked">
+                    <bool>true</bool>
+                   </property>
+                  </widget>
+                 </item>
+                </layout>
+               </widget>
+              </item>
+              <item>
+               <widget class="QLabel" name="trajectory_replay_safety_hint">
+                <property name="text">
+                 <string>仅回放勾选的通道与关节。Hand 需要已连接；停止运动与急停始终位于全局操作区。</string>
+                </property>
+                <property name="wordWrap">
+                 <bool>true</bool>
+                </property>
+                <property name="role" stdset="0">
+                 <string>mutedText</string>
+                </property>
+               </widget>
+              </item>
+              <item>
+               <spacer name="trajectory_replay_parameters_space">
+                <property name="orientation">
+                 <enum>Qt::Vertical</enum>
+                </property>
+                <property name="sizeHint">
+                 <size>
+                  <width>20</width>
+                  <height>20</height>
+                 </size>
+                </property>
+               </spacer>
+              </item>
+             </layout>
+            </widget>
+           </widget>
+          </item>
+         </layout>
+        </widget>
+       </widget>
+      </item>
+      <item>
+       <widget class="QStackedWidget" name="trajectory_actions_stack">
+        <property name="currentIndex">
+         <number>1</number>
+        </property>
+        <property name="sizePolicy">
+         <sizepolicy hsizetype="Expanding" vsizetype="Fixed">
+          <horstretch>0</horstretch>
+          <verstretch>0</verstretch>
+         </sizepolicy>
+        </property>
+        <widget class="QFrame" name="trajectory_record_actions">
+         <property name="role" stdset="0">
+          <string>surfacePanel</string>
+         </property>
+         <layout class="QHBoxLayout" name="trajectory_record_actions_layout">
+          <property name="leftMargin">
+           <number>10</number>
+          </property>
+          <property name="topMargin">
+           <number>10</number>
+          </property>
+          <property name="rightMargin">
+           <number>10</number>
+          </property>
+          <property name="bottomMargin">
+           <number>10</number>
+          </property>
+          <property name="spacing">
+           <number>8</number>
+          </property>
+          <item>
+           <widget class="QLabel" name="trajectory_record_action_hint">
+            <property name="text">
+             <string>记录当前操作流程</string>
+            </property>
+            <property name="wordWrap">
+             <bool>true</bool>
+            </property>
+            <property name="role" stdset="0">
+             <string>mutedText</string>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <spacer name="trajectory_record_action_space">
+            <property name="orientation">
+             <enum>Qt::Horizontal</enum>
+            </property>
+            <property name="sizeHint">
+             <size>
+              <width>20</width>
+              <height>20</height>
+             </size>
+            </property>
+           </spacer>
+          </item>
+          <item>
+           <widget class="QPushButton" name="trajectory_record_button">
+            <property name="text">
+             <string>开始记录</string>
+            </property>
+            <property name="role" stdset="0">
+             <string>primary</string>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QPushButton" name="trajectory_finish_button">
+            <property name="text">
+             <string>停止并保存</string>
+            </property>
+            <property name="role" stdset="0">
+             <string>primary</string>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QPushButton" name="trajectory_save_button">
+            <property name="text">
+             <string>重试保存</string>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QPushButton" name="trajectory_cancel_button">
+            <property name="text">
+             <string>取消记录</string>
+            </property>
+            <property name="role" stdset="0">
+             <string>quiet</string>
+            </property>
+           </widget>
+          </item>
+         </layout>
+        </widget>
+        <widget class="QFrame" name="trajectory_replay_actions">
+         <property name="role" stdset="0">
+          <string>surfacePanel</string>
+         </property>
+         <layout class="QHBoxLayout" name="trajectory_replay_actions_layout">
+          <property name="leftMargin">
+           <number>10</number>
+          </property>
+          <property name="topMargin">
+           <number>10</number>
+          </property>
+          <property name="rightMargin">
+           <number>10</number>
+          </property>
+          <property name="bottomMargin">
+           <number>10</number>
+          </property>
+          <property name="spacing">
+           <number>8</number>
+          </property>
+          <item>
+           <widget class="QLabel" name="trajectory_replay_action_hint">
+            <property name="text">
+             <string>预览仅读取统计信息，不驱动机器人。</string>
+            </property>
+            <property name="wordWrap">
+             <bool>true</bool>
+            </property>
+            <property name="role" stdset="0">
+             <string>mutedText</string>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <spacer name="trajectory_replay_action_space">
+            <property name="orientation">
+             <enum>Qt::Horizontal</enum>
+            </property>
+            <property name="sizeHint">
+             <size>
+              <width>20</width>
+              <height>20</height>
+             </size>
+            </property>
+           </spacer>
+          </item>
+          <item>
+           <widget class="QPushButton" name="trajectory_preview_button">
+            <property name="text">
+             <string>读取预览</string>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QPushButton" name="trajectory_play_button">
+            <property name="text">
+             <string>开始回放</string>
+            </property>
+            <property name="role" stdset="0">
+             <string>primary</string>
+            </property>
+           </widget>
+          </item>
+         </layout>
+        </widget>
+       </widget>
+      </item>
+     </layout>
     </widget>
    </item>
   </layout>
-  <property name="density" stdset="0">
-   <string notr="true">compact</string>
-  </property>
  </widget>
  <resources />
  <connections />

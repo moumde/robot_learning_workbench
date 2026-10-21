@@ -8,7 +8,7 @@ from teleop.gello_cr.ui.main_window import OperatorMainWindow
 from teleop.gello_cr.ui.presenter import OperatorUiPresenter
 
 
-def test_six_pages_share_one_stop_and_navigation_does_not_actuate():
+def test_five_pages_share_one_stop_and_navigation_does_not_actuate():
     app = QApplication.instance() or QApplication([])
     requests = []
     service = ApplicationService(state_machine=WorkflowStateMachine(WorkflowState.REPLAY_RUNNING))
@@ -20,8 +20,8 @@ def test_six_pages_share_one_stop_and_navigation_does_not_actuate():
     window = OperatorMainWindow(presenter, CallbackCommandPort(requests.append))
     window.show()
     try:
-        assert window.navigation.count() == 6
-        for index in range(6):
+        assert window.navigation.count() == 5
+        for index in range(window.navigation.count()):
             window.navigation.setCurrentRow(index)
             app.processEvents()
             assert window.stop_motion_button.isVisible()

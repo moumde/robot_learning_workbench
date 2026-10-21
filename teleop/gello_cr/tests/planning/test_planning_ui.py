@@ -9,6 +9,7 @@ from PySide6.QtWidgets import QApplication
 from teleop.gello_cr.app import ApplicationService, build_application_view_model
 from teleop.gello_cr.core.state_machine import Command, WorkflowState, WorkflowStateMachine
 from teleop.gello_cr.ui.planning_panel import PlanningPanel
+from teleop.gello_cr.ui.theme import WORKBENCH_STYLESHEET
 
 
 @pytest.fixture
@@ -102,6 +103,7 @@ def test_motion_error_is_shown_before_the_collision_capability_notice(panel, sta
     text = widget.preview_text.toPlainText()
     assert text.startswith(label + "：" + error + "\n\n说明：路径碰撞预检：未实现")
     assert widget.status_label.text() == status
+    assert widget.result_state.text().startswith(label + "：" + error)
     assert not widget.execute_button.isEnabled()
 
 
@@ -143,3 +145,78 @@ def test_add_current_reads_tcp_through_command_and_stop_stays_available_while_bu
     widget.render({"running": True, "status": "EXECUTING"}, view, busy=True)
     assert not widget.plan_button.isEnabled()
     assert not widget.table.isEnabled()
+
+
+def test_mode_specific_waypoint_controls_do_not_clutter_single_targets(panel):
+    widget, _, _ = panel
+    for kind in ("joint", "tcp_ptp", "tcp_linear", "waypoints"):
+        widget.mode_combo.setCurrentIndex(widget.mode_combo.findData(kind))
+        QApplication.processEvents()
+        waypoints = kind == "waypoints"
+        assert widget.table.isVisible() is waypoints
+        for button in (
+            widget.add_current_button,
+            widget.add_button,
+            widget.delete_button,
+            widget.up_button,
+            widget.down_button,
+        ):
+            assert button.isVisible() is waypoints
+        assert all(spin.isVisible() for spin in widget.target_spins)
+        assert widget.read_button.isVisible()
+        assert widget.target_labels[0].text() == ("J1 °" if kind == "joint" else "X mm")
+
+
+def test_compact_planning_workspace_keeps_editor_and_actions_in_view(panel):
+    widget, _, _ = panel
+    widget.setStyleSheet(WORKBENCH_STYLESHEET)
+    widget.resize(718, 440)
+    widget.mode_combo.setCurrentIndex(widget.mode_combo.findData("waypoints"))
+    QApplication.processEvents()
+    assert widget.width() == 718
+    assert widget.height() == 440
+    assert widget._ui.planning_editor_scroll.verticalScrollBar().maximum() == 0
+    assert widget.editor_tabs.geometry().right() < widget.parameter_panel.geometry().left()
+    assert widget.table.height() >= 100
+    for button in (widget.plan_button, widget.execute_button, widget.save_button):
+        position = button.mapTo(widget, button.rect().topLeft())
+        assert widget.rect().contains(position)
+        assert widget.rect().contains(position + button.rect().bottomRight())
+        assert position.y() > widget.editor_tabs.geometry().bottom()
+    for spin in widget.target_spins:
+        position = spin.mapTo(widget, spin.rect().topLeft())
+        assert widget.rect().contains(position + spin.rect().bottomRight())
+
+
+def test_result_summary_uses_real_metrics_and_marks_an_edited_plan(panel):
+    widget, _, view = panel
+    widget.plan_button.click()
+    snapshot = {
+        "plan_id": "new-plan",
+        "status": "READY",
+        "preview": {"start_joint_rad": [0] * 6},
+        "metrics": {"frame_count": 24, "duration_s": 1.25, "path_length_tcp_m": 0.32},
+    }
+    widget.render(snapshot, view)
+    assert "24 帧" in widget.result_summary.text()
+    assert "1.250 s" in widget.result_summary.text()
+    assert "0.32 m" in widget.result_summary.text()
+    widget.speed_spin.setValue(50)
+    assert "重新规划" in widget.result_state.text()
+    assert not widget.execute_button.isEnabled()
+    assert not widget.save_button.isEnabled()
+
+
+def test_replay_activity_blocks_planning_edits_and_saved_plan_actions(panel):
+    widget, _, view = panel
+    widget.plan_button.click()
+    snapshot = {"plan_id": "new-plan", "status": "READY", "preview": {"start_joint_rad": [0] * 6}}
+    widget.render(snapshot, view)
+    replay_service = ApplicationService(
+        state_machine=WorkflowStateMachine(state=WorkflowState.REPLAY_RUNNING)
+    )
+    replay_view = build_application_view_model(replay_service.snapshot(), {}, {})
+    widget.render(snapshot, replay_view)
+    assert not widget.target_spins[0].isEnabled()
+    assert not widget.save_button.isEnabled()
+    assert not widget.plan_button.isEnabled()

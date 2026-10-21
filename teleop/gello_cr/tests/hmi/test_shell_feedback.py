@@ -53,7 +53,7 @@ def test_recovery_discovery_preserves_page_and_offers_explicit_entry(shell):
     assert window.navigation.currentRow() == 1
     assert window.recovery_button.isVisible()
     window.recovery_button.click()
-    assert window.pages.currentIndex() == 3
+    assert window.pages.currentIndex() == 2
     assert window.dataset_page.isVisibleTo(window.pages.currentWidget())
     assert requests == []
 

@@ -97,7 +97,7 @@ def test_recovery_panel_submits_explicit_partial_and_resume_decisions(window):
     assert widget.navigation.currentRow() == 0
     assert widget.collection.isVisible()
     widget.recovery_button.click()
-    assert widget.navigation.currentRow() == 3
+    assert widget.navigation.currentRow() == 2
     assert widget.dataset_page.isVisible()
     panel.failure_button.click()
     assert requests[-1].command is Command.RESOLVE_PARTIAL_EPISODE
