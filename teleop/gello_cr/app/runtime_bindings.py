@@ -60,6 +60,8 @@ class RuntimeCommandBindings:
         self.lifecycle = lifecycle or RuntimeLifecycleCallbacks()
         self._trajectory_run = None
         self._trajectory_serial = 0
+        self._trajectory_recording_run = None
+        self._trajectory_recording_serial = 0
         self._point_serial = 0
         self._point_run = None
         self._completion_jobs = BackgroundJobs()
@@ -89,14 +91,10 @@ class RuntimeCommandBindings:
             Command.EXECUTE_PLAN: self._execute_plan,
             Command.STOP_POINT_MOTION: self._stop_point_motion,
             Command.POINT_MOTION_COMPLETED: self._point_completed,
-            Command.START_TRAJECTORY_RECORDING: lambda p: (
-                self.teleop_engine.start_trajectory_recording(self._required_text(p, "name"))
-            ),
+            Command.START_TRAJECTORY_RECORDING: self._start_trajectory_recording,
             Command.STOP_TRAJECTORY_RECORDING: self._stop_trajectory_recording,
             Command.SAVE_TRAJECTORY: lambda p: self.teleop_engine.save_trajectory(),
-            Command.CANCEL_TRAJECTORY_RECORDING: lambda p: (
-                self.teleop_engine.cancel_trajectory_recording()
-            ),
+            Command.CANCEL_TRAJECTORY_RECORDING: self._cancel_trajectory_recording,
             Command.LIST_TRAJECTORIES: lambda p: self.teleop_engine.list_trajectories(),
             Command.PREVIEW_TRAJECTORY: lambda p: self.teleop_engine.preview_trajectory(
                 self._required_text(p, "trajectory_id")
@@ -324,6 +322,7 @@ class RuntimeCommandBindings:
             raise RuntimeError("HOME 完成状态已被其他动作或停止覆盖")
 
     def _return_home(self, _payload: Mapping[str, Any]) -> None:
+        self._trajectory_run = self._point_run = self._trajectory_recording_run = None
         self.teleop_engine.return_home()
         self._home_completed(_payload)
 
@@ -341,9 +340,69 @@ class RuntimeCommandBindings:
             Command.RESET_ESTOP,
         )()
 
-    def _stop_trajectory_recording(self, _payload):
-        self.teleop_engine.stop_trajectory_recording()
-        return self.teleop_engine.save_trajectory()
+    def _start_trajectory_recording(self, payload):
+        self._require_permission(Command.START_TRAJECTORY_RECORDING, payload)
+        name = self._required_text(payload, "name")
+        self._trajectory_recording_serial += 1
+        run = self._trajectory_recording_run = self._trajectory_recording_serial
+        try:
+            return self.teleop_engine.start_trajectory_recording(
+                name, on_finished=lambda error: self._trajectory_recording_finished(run, error)
+            )
+        except Exception:
+            if self._trajectory_recording_run == run:
+                self._trajectory_recording_run = None
+            self._report_trajectory_cleanup_fault()
+            raise
+
+    def _report_trajectory_cleanup_fault(self):
+        if self.teleop_engine.state == "fault":
+            self.service.report_external_fault(self.teleop_engine.last_error)
+
+    def _trajectory_recording_finished(self, run, error):
+        if run != self._trajectory_recording_run:
+            return
+        if error or self.teleop_engine.state == "fault":
+            self._trajectory_recording_run = None
+            self.service.report_external_fault(
+                "轨迹录制停止：" + str(error or self.teleop_engine.last_error)
+            )
+            return
+        self._completion_jobs.start(
+            lambda: self._finish_recording_run(run), name="Trajectory-Recording-Completion"
+        )
+
+    def _finish_recording_run(self, run):
+        try:
+            self.service.dispatch(Command.STOP_TRAJECTORY_RECORDING, {"recording_run": run})
+        except (InvalidTransition, OSError):
+            # A newer operation owns motion, or a failed save remains retryable.
+            pass
+
+    def _stop_trajectory_recording(self, payload):
+        if "recording_run" in payload and payload["recording_run"] != self._trajectory_recording_run:
+            raise InvalidTransition("Trajectory recording completion belongs to an earlier run")
+        self._trajectory_recording_run = None
+        try:
+            self.teleop_engine.stop_trajectory_recording()
+        except Exception:
+            self._report_trajectory_cleanup_fault()
+            raise
+        try:
+            return self.teleop_engine.save_trajectory()
+        except Exception as exc:
+            # Physical stop has succeeded; storage failure must not retain a
+            # TELEOP_RUNNING workflow while Retry Save owns pending frames.
+            exc.trajectory_recording_stopped = True
+            raise
+
+    def _cancel_trajectory_recording(self, _payload):
+        self._trajectory_recording_run = None
+        try:
+            return self.teleop_engine.cancel_trajectory_recording()
+        except Exception:
+            self._report_trajectory_cleanup_fault()
+            raise
 
     def _replay_trajectory(self, payload):
         self._require_permission(Command.REPLAY_TRAJECTORY, payload)
@@ -435,5 +494,5 @@ class RuntimeCommandBindings:
                 self.recorder.stop_episode()
 
     def close(self, timeout=3.0):
-        self._trajectory_run = self._point_run = None
+        self._trajectory_run = self._point_run = self._trajectory_recording_run = None
         self._completion_jobs.close(timeout)

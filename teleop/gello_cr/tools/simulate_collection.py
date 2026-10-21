@@ -68,6 +68,9 @@ class SimulationRun:
         self.rig = SimulationRig()
         config = json.loads((ROOT / "config/teleop/gello_cr.json").read_text())
         config["robot"]["ip"] = "simulation.invalid"
+        home = self.rig.api.joint_position
+        home[0] += 10.0
+        config.setdefault("presets", {})["HOME"] = {"robot_joints_deg": home}
         config["gello"]["port"] = "/simulation/gello"
         config["o6"]["port"] = "/simulation/o6"
         config["trajectory"]["root"] = str(self.output / "dataset/replay/trajectories")
@@ -121,6 +124,17 @@ class SimulationRun:
         self.service = self.app.backend.service
         self.recorder = self.app.runtime.recorder
         self.engine = self.app.runtime.teleop_engine
+        self.report["motion_sample_counts"] = {}
+        capture = self.recorder.source.capture
+
+        def observed_capture():
+            frame = capture()
+            source = str(frame.metadata.get("motion_source"))
+            counts = self.report["motion_sample_counts"]
+            counts[source] = counts.get(source, 0) + 1
+            return frame
+
+        self.recorder.source.capture = observed_capture
         self.service.subscribe(
             lambda event: self.report["events"].append(
                 {
@@ -318,6 +332,26 @@ class SimulationRun:
                    "Collection uses one parent camera interface")
         self.check(isinstance(self.app.runtime.cr3a_lifecycle.device.backend, CR3Interface),
                    "Collection uses the parent robot connection owner")
+        self.command(Command.START_TRAJECTORY_RECORDING, {"name": "automatic teleop"})
+        self.rig.motion_enabled = True
+        self.run_for(1.0)
+        self.check(
+            self.engine.state == "following" and self.engine.recording,
+            "Start trajectory recording starts teleop and sampling together",
+        )
+        self.command(Command.STOP_TRAJECTORY_RECORDING)
+        sends = self.rig.api.send_count
+        self.run_for(0.2)
+        self.check(
+            self.engine.state == "idle" and not self.engine.recording
+            and self.service.state is WorkflowState.ROBOT_ENABLED
+            and self.rig.api.send_count == sends,
+            "Finish trajectory recording saves and leaves teleop stopped",
+        )
+        self.check(
+            any(item["name"] == "automatic teleop" for item in self.engine.list_trajectories()),
+            "Coupled trajectory recording is saved to the shared trajectory store",
+        )
         self.start_follow()
         self.command(Command.CREATE_DATASET, self.payload)
         healthy_start = time.monotonic()
@@ -328,7 +362,6 @@ class SimulationRun:
         for index in range(3):
             self.command(Command.START_EPISODE, self.payload)
             for command in (
-                Command.RETURN_HOME,
                 Command.DISCONNECT,
                 Command.PREPARE_DEVICES,
                 Command.SELECT_DATASET_FORMAT,
@@ -339,7 +372,36 @@ class SimulationRun:
                     command.name + " locked during recording",
                 )
             episode_start = time.monotonic()
-            self.run_for(self.args.duration / 3, healthy=True)
+            if index == 0:
+                self.run_for(self.args.duration / 6, healthy=True)
+                before = self.recorder.snapshot()
+                self.check(self.service.can(Command.RETURN_HOME), "HOME available during teleop Episode")
+                self.rig.motion_enabled = False
+                self.command(Command.RETURN_HOME, timeout=30)
+                sends = self.rig.api.send_count
+                self.run_for(0.2)
+                after = self.recorder.snapshot()
+                self.check(
+                    after["episode_active"] and not after["error"]
+                    and after["dataset_id"] == before["dataset_id"]
+                    and after["episode_index"] == before["episode_index"]
+                    and after["buffered_frames"] > before["buffered_frames"],
+                    "HOME stays inside the same continuously sampled Episode",
+                )
+                self.check(
+                    self.report["motion_sample_counts"].get("HOME", 0) > 0,
+                    "Episode captures accepted HOME motion targets",
+                )
+                self.check(
+                    self.engine.state == "idle"
+                    and self.service.state is WorkflowState.ROBOT_ENABLED
+                    and self.rig.api.send_count == sends,
+                    "HOME completion stays stopped until explicit Start Teleop",
+                )
+                self.start_follow()
+                self.run_for(self.args.duration / 6, healthy=True)
+            else:
+                self.run_for(self.args.duration / 3, healthy=True)
             recording_s += time.monotonic() - episode_start
             if index == 0:
                 self.window.grab().save(str(self.output / "recording.png"))

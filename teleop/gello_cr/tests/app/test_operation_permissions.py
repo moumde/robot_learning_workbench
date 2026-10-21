@@ -14,8 +14,8 @@ from teleop.gello_cr.core.state_machine import (
     WorkflowState,
     WorkflowStateMachine,
 )
-from teleop.gello_cr.ui.backend import OperatorBackend
 from teleop.gello_cr.tests.fakes.runtime import FakeO6, FakeRoArm, FakeRobot
+from teleop.gello_cr.ui.backend import OperatorBackend
 
 
 class Session(FakeRobot):
@@ -160,13 +160,13 @@ def test_disconnect_keeps_devices_open_when_motion_cannot_drain(application):
 @pytest.mark.parametrize(
     "state",
     [
+        WorkflowState.OFFLINE,
         WorkflowState.CONNECTED,
-        WorkflowState.TELEOP_RUNNING,
         WorkflowState.FAULT,
         WorkflowState.ESTOP,
     ],
 )
-def test_home_cannot_bypass_enable_motion_or_safety_state(state):
+def test_home_cannot_bypass_enable_or_safety_state(state):
     service = ApplicationService(state_machine=WorkflowStateMachine(state))
     moves = []
     service.set_handler(Command.RETURN_HOME, lambda p: moves.append(True))
@@ -208,16 +208,15 @@ def test_pending_save_and_replay_permission_is_shared(frames, error, success, fa
     assert calls == []
 
 
-def test_home_runtime_rejects_recording_without_altering_it(application):
+def test_home_runtime_preserves_recording_without_altering_it(application):
     backend, _ = application
     backend.service.dispatch(Command.CONNECT)
     backend.service.dispatch(Command.POWER_ON)
     backend.teleop_engine.save_home()
     backend.recorder.value.update(episode_active=True)
-    with pytest.raises(RuntimeError, match="Episode|录制"):
-        backend.teleop_engine.return_home()
+    backend.teleop_engine.return_home()
     assert backend.recorder.value["episode_active"]
-    assert backend.teleop_engine.robot.movej_targets == []
+    assert len(backend.teleop_engine.robot.movej_targets) == 1
 
 
 def test_home_runtime_requires_explicit_enable_and_does_not_enable_implicitly(application):

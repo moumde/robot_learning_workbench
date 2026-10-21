@@ -45,12 +45,16 @@ class TrajectoryRecorder:
         with self._lock:
             return tuple(self._frames)
 
-    def start(self, name: str, metadata: dict | None = None) -> None:
+    def start(
+        self, name: str, metadata: dict | None = None, *, should_continue=None, on_finished=None
+    ) -> None:
         if self.thread is not None and self.thread.is_alive():
             raise RuntimeError("Trajectory recording already active")
         if not name.strip():
             raise ValueError("Trajectory name cannot be empty")
         self._name, self._metadata = name.strip(), dict(metadata or {})
+        self._should_continue = should_continue
+        self._on_finished = on_finished
         first = self.source.sample()
         validate_frame(first)
         self._origin = first.timestamp
@@ -63,7 +67,12 @@ class TrajectoryRecorder:
         self.error = ""
         self.stop_event.clear()
         self.thread = threading.Thread(target=self._run, name="Trajectory-Record", daemon=True)
-        self.thread.start()
+        try:
+            self.thread.start()
+        except Exception:
+            self.thread = None
+            self.stop_event.set()
+            raise
 
     def _run(self):
         next_sample = time.monotonic()
@@ -72,6 +81,8 @@ class TrajectoryRecorder:
             while not self.stop_event.is_set():
                 next_sample += 1.0 / self.fps
                 if self.stop_event.wait(max(0.0, next_sample - time.monotonic())):
+                    break
+                if self._should_continue is not None and not self._should_continue():
                     break
                 frame = self.source.sample()
                 elapsed = frame.timestamp - self._origin
@@ -88,6 +99,8 @@ class TrajectoryRecorder:
             self.error = str(exc)
         finally:
             self.stop_event.set()
+            if self._on_finished is not None:
+                self._on_finished(self.error or None)
 
     def _join(self):
         self.stop_event.set()

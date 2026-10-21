@@ -25,6 +25,7 @@ _MOTION_STARTS = frozenset(
     {
         Command.RETURN_HOME,
         Command.START_TELEOP,
+        Command.START_TRAJECTORY_RECORDING,
         Command.REPLAY_TRAJECTORY,
         Command.EXECUTE_PLAN,
         Command.START_DAGGER,
@@ -76,8 +77,6 @@ def operation_permission(command, context, payload=None):
         return OperationPermission(
             machine.can(command), "当前安全状态已生效" if not machine.can(command) else ""
         )
-    if command is Command.RETURN_HOME and episode_open:
-        return deny("Episode 未处理；请先结束录制并保存或丢弃，再回 HOME")
     if (
         command in (Command.REPLAY_TRAJECTORY, Command.EXECUTE_PLAN, Command.PLAN_MOTION)
         and recording is RecordingState.PENDING
@@ -95,7 +94,7 @@ def operation_permission(command, context, payload=None):
             return deny("故障或紧急停止后只能保存失败 Episode 或丢弃")
     if not machine.can(command, source=source):
         if command is Command.RETURN_HOME:
-            return deny("HOME 需要机器人明确使能并停止当前运动，且无故障或紧急停止")
+            return deny("HOME 需要机器人明确使能，且无故障或紧急停止")
         if command is Command.START_TELEOP:
             if state is WorkflowState.OFFLINE:
                 return deny("请先连接机器人，再明确上使能并准备遥操设备")
@@ -123,14 +122,10 @@ def operation_permission(command, context, payload=None):
             if capability in capabilities and not capabilities[capability]:
                 return deny("当前机器人不支持此操作")
     if command is Command.RETURN_HOME:
-        motion = runtime.get("motion") or {}
-        if (
-            runtime.get("state", "idle") != "idle"
-            or motion.get("source")
-            or motion.get("running")
-            or runtime.get("o6_action_active")
-        ):
-            return deny("请先停止当前运动，再回 HOME")
+        if runtime.get("state", "idle") not in (
+            "idle", "following", "replay", "point_move", "dagger", "master_free"
+        ) or runtime.get("o6_action_active"):
+            return deny("HOME 或手部恢复动作正在执行，请先等待完成或停止")
     if command in (Command.PREPARE_DEVICES, Command.STOP_CAMERAS) and episode_open:
         return deny("Episode 未处理；请先保存或丢弃，再切换采集设备")
     if ready is not None:
@@ -151,7 +146,7 @@ def operation_permission(command, context, payload=None):
                     "Camera frames are stale/unavailable: "
                     + str(ready.get("camera_error") or "请检查相机画面")
                 )
-        if command is Command.START_TELEOP or (
+        if command in (Command.START_TELEOP, Command.START_TRAJECTORY_RECORDING) or (
             command is Command.START_EPISODE and source == "teleop"
         ):
             if not devices_ready:

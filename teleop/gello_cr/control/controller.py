@@ -183,8 +183,13 @@ class TeleopController:
             urdf_path = self.store.path.parent / urdf_path
         kinematics = GelloKinematics(urdf_path) if gello_mode != "joint" else None
         robot_cfg = self.store.data["robot"]
-        lease = self.motion.acquire(MotionSource.TELEOP, on_cancel=self.hooks.stop.set)
-        self._lease = lease
+        with self.hooks.lock:
+            # HOME reserves its cancellation generation under this same lock.
+            # Reject stale startup before acquire can clear HOME's accepted target.
+            if self.hooks.shutdown.is_set() or self.hooks.generation() != stop_generation:
+                raise TeleopError("GELLO 跟随启动已被停止或 HOME 取消")
+            lease = self.motion.acquire(MotionSource.TELEOP, on_cancel=self.hooks.stop.set)
+            self._lease = lease
         try:
             with self.hooks.lock:
                 lease.check()

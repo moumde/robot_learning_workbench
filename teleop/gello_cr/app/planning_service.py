@@ -143,10 +143,14 @@ class PointMotionService:
                 self._result, self._profile, self._robot = result, profile, robot
                 self._status = "READY" if result.success else "PLANNING_FAILED"
                 self._error = "; ".join(result.errors)
+            if not result.success:
+                self.runtime._event("error", "精确走点规划失败：" + self._error)
             return result
         except Exception as exc:
+            error = str(exc) or type(exc).__name__
             with self._lock:
-                self._status, self._error = "PLANNING_FAILED", str(exc)
+                self._status, self._error = "PLANNING_FAILED", error
+            self.runtime._event("error", "精确走点规划失败：" + error)
             raise
 
     def _plan(self, plan_id):
@@ -194,30 +198,44 @@ class PointMotionService:
             > profile[2].joint_tolerance_rad
         ):
             raise ValueError("机器人已离开规划起点，请重新读取并规划")
-        if generation != runtime.stop_generation:
-            raise MotionPreempted("Point motion cancelled during preparation")
-        self._stop.clear()
-        self._requested_status = ReachStatus.PREEMPTED
         lease = None
         try:
-            lease = runtime.motion.acquire(
-                MotionSource.POINT_MOVE, allow_preempt=True, on_cancel=self._stop.set
-            )
-            self._lease = lease
+            with runtime._state_lock:
+                if (
+                    runtime._stop_generation != generation
+                    or runtime._shutdown_requested.is_set()
+                    or runtime._home_lock.locked()
+                    or runtime.state not in ("idle", "following")
+                    or self.running
+                    or runtime.replaying
+                ):
+                    raise MotionPreempted("Point motion cancelled during preparation")
+                self._stop.clear()
+                self._requested_status = ReachStatus.PREEMPTED
+                lease = runtime.motion.acquire(
+                    MotionSource.POINT_MOVE, allow_preempt=True, on_cancel=self._stop.set
+                )
+                self._lease = lease
+                runtime._state = "point_move"
+                runtime._last_error = ""
             runtime._join_follow_producer("Point motion takeover")
-            lease.check()
-            if runtime.stop_generation != generation or self._stop.is_set():
-                raise MotionPreempted("Point motion start cancelled")
-            runtime._set_state("point_move")
-            with self._lock:
-                self._status, self._error = "EXECUTING", ""
-            self.thread = threading.Thread(
-                target=self._run,
-                args=(trajectory, lease, profile[2], generation, on_finished),
-                name="Point-Motion",
-                daemon=True,
-            )
-            self.thread.start()
+            with runtime._state_lock:
+                lease.check()
+                if runtime._stop_generation != generation or self._stop.is_set():
+                    raise MotionPreempted("Point motion start cancelled")
+                with self._lock:
+                    self._status, self._error = "EXECUTING", ""
+                self.thread = threading.Thread(
+                    target=self._run,
+                    args=(trajectory, lease, profile[2], generation, on_finished),
+                    name="Point-Motion",
+                    daemon=True,
+                )
+                try:
+                    self.thread.start()
+                except Exception:
+                    self.thread = None
+                    raise
         except Exception:
             if lease is not None:
                 lease.release()

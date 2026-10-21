@@ -3,8 +3,8 @@ import pytest
 from teleop.gello_cr.core.state_machine import (
     Command,
     InvalidTransition,
-    WorkflowState,
     RecordingState,
+    WorkflowState,
     WorkflowStateMachine,
 )
 
@@ -52,17 +52,13 @@ def test_disconnect_is_rejected_while_recording() -> None:
         workflow.apply(Command.DISCONNECT)
 
 
-def test_home_requires_episode_resolution_and_explicit_teleop_stop() -> None:
+def test_home_preserves_active_episode_and_requires_explicit_teleop_restart() -> None:
     workflow = WorkflowStateMachine(WorkflowState.TELEOP_RUNNING, recording_state=RecordingState.RECORDING)
-    assert not workflow.can(Command.RETURN_HOME)
-    workflow.apply(Command.STOP_EPISODE)
-    assert not workflow.can(Command.RETURN_HOME)
-    workflow.apply(Command.SAVE_SUCCESS)
-    assert not workflow.can(Command.RETURN_HOME)
-    workflow.apply(Command.STOP_TELEOP)
     assert workflow.apply(Command.RETURN_HOME) is WorkflowState.RETURNING_HOME
+    assert workflow.recording_state is RecordingState.RECORDING
     assert workflow.apply(Command.HOME_COMPLETED) is WorkflowState.ROBOT_ENABLED
-    assert workflow.recording_state is RecordingState.IDLE
+    assert workflow.recording_state is RecordingState.RECORDING
+    assert workflow.apply(Command.START_TELEOP) is WorkflowState.TELEOP_RUNNING
 
 
 def test_save_success_from_robot_enabled_is_not_a_full_collection_transition() -> None:

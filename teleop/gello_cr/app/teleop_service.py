@@ -78,9 +78,11 @@ class TeleopService:
         if o6_fault is None or any(o6_fault):
             raise RuntimeError(f"O6 故障: {o6_fault}")
 
+        self.runtime.capture_snapshot.prepare_teleop_restart(stop_generation)
         if self.runtime.master_type == "gello":
             self.runtime.teleop_controller.start(master, stop_generation)
             self.runtime._follow_thread = self.runtime.teleop_controller.thread
+            self.runtime._follow_lease = self.runtime.teleop_controller._lease
             return
 
         slave_tcp = self.runtime.robot.tcp_position()
@@ -92,11 +94,20 @@ class TeleopService:
                 or self.runtime._stop_generation != stop_generation
             ):
                 raise RuntimeError("XYZ 跟随启动已被软件紧急停止")
+            # HOME reserves its generation under the same lock. A delayed
+            # startup must not acquire a fresh lease after HOME has finished.
+            lease = self.runtime.motion.acquire(
+                MotionSource.TELEOP, on_cancel=self.runtime._follow_stop.set
+            )
+            self.runtime._follow_lease = lease
             self.runtime._follow_stop.clear()
-        lease = self.runtime.motion.acquire(
-            MotionSource.TELEOP, on_cancel=self.runtime._follow_stop.set
-        )
         try:
+            lease.check()
+            if (
+                self.runtime._shutdown_requested.is_set()
+                or self.runtime.stop_generation != stop_generation
+            ):
+                raise RuntimeError("XYZ 跟随启动已被软件紧急停止")
             if getattr(self.runtime.robot, "motion_mode", "servoj") != "movej":
                 lease.open_servo(
                     robot_cfg["servoj_vmax"],

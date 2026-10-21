@@ -65,28 +65,13 @@ def test_estop_generation_cancels_late_dagger_start_before_servoj(engine):
     pending.robot.start_control.assert_not_called()
 
 
-def test_home_requires_explicit_dagger_stop_and_finalization_before_move(engine):
+def test_home_preempts_dagger_and_finalizes_it_before_move(engine):
     engine.store.data["presets"]["HOME"] = {"robot_joints_deg": [1.0] * 6 + [0.0]}
     running = controller()
     engine.start_external_control(running, engine.stop_generation)
     assert running.started.wait(1)
     producer = engine._follow_thread
     policy_lease = engine._policy_lease
-    with pytest.raises(RuntimeError, match="idle"):
-        engine.return_home()
-    assert producer.is_alive() and engine._follow_thread is producer
-    assert engine.external_control is running
-    assert engine.state == "dagger"
-    assert policy_lease.active
-    assert engine.motion.current_owner is MotionSource.POLICY
-    running.request_stop.assert_not_called()
-    running.stop.assert_not_called()
-    assert engine.robot.movej_targets == []
-    engine.stop_follow("explicit stop before HOME")
-    assert not producer.is_alive()
-    assert not policy_lease.active
-    assert engine.external_control is None
-    assert engine.state == "idle"
     original_movej = engine.robot.movej
 
     def home_movej(*args):
@@ -98,6 +83,9 @@ def test_home_requires_explicit_dagger_stop_and_finalization_before_move(engine)
 
     engine.robot.movej = home_movej
     engine.return_home()
+    assert not producer.is_alive()
+    assert not policy_lease.active
+    running.request_stop.assert_called()
     assert engine.external_control is None
     assert engine.robot.joints == [1.0] * 6 + [0.0]
     assert engine.o6.position == tuple(
