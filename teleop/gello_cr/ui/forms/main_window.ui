@@ -958,38 +958,21 @@
              </layout>
             </widget>
            </widget>
-           <widget class="QScrollArea" name="shell_ScrollArea_5">
-            <property name="visible">
-             <bool>false</bool>
-            </property>
-            <property name="sizePolicy">
-             <sizepolicy hsizetype="Expanding" vsizetype="Expanding">
-              <horstretch>0</horstretch>
-              <verstretch>0</verstretch>
-             </sizepolicy>
-            </property>
-            <property name="widgetResizable">
-             <bool>true</bool>
-            </property>
-            <property name="frameShape">
-             <enum>QFrame::StyledPanel</enum>
-            </property>
-            <widget class="QWidget" name="shell_robot_page">
-             <layout class="QVBoxLayout" name="shell_robot_page_layout">
-              <property name="leftMargin">
-               <number>0</number>
-              </property>
-              <property name="topMargin">
-               <number>0</number>
-              </property>
-              <property name="rightMargin">
-               <number>0</number>
-              </property>
-              <property name="bottomMargin">
-               <number>0</number>
-              </property>
-             </layout>
-            </widget>
+           <widget class="QWidget" name="shell_robot_page">
+            <layout class="QVBoxLayout" name="shell_robot_page_layout">
+             <property name="leftMargin">
+              <number>0</number>
+             </property>
+             <property name="topMargin">
+              <number>0</number>
+             </property>
+             <property name="rightMargin">
+              <number>0</number>
+             </property>
+             <property name="bottomMargin">
+              <number>0</number>
+             </property>
+            </layout>
            </widget>
            <widget class="QScrollArea" name="shell_ScrollArea_6">
             <property name="visible">
