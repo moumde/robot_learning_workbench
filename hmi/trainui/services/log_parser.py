@@ -14,8 +14,9 @@ DICT_VALUE_RE = re.compile(
 )
 DICT_STEP_RE = re.compile(r"[\"']step[\"']\s*:\s*(\d+)")
 PROGRESS_RE = re.compile(
-    r"Progress on:\s*(?P<current>-|\d+(?:\.\d+)?)\s*(?:it)?\s*/\s*"
-    r"(?P<total>\d+(?:\.\d+)?)\s*(?:it)?"
+    r"Progress on:\s*(?P<current>-|[\d,]+(?:\.\d+)?[kKmMgGtTpPeE]?)\s*(?:it)?\s*/\s*"
+    r"(?P<total>[\d,]+(?:\.\d+)?[kKmMgGtTpPeE]?)\s*(?:it)?(?=\s|$)",
+    re.IGNORECASE,
 )
 
 
@@ -113,8 +114,32 @@ class LogParser:
         if current == "-":
             return None
 
-        completed = max(0, int(round(float(current))))
-        total = max(1, int(round(float(match.group("total")))))
+        def parse_scaled_number(value: str) -> float:
+            value = value.strip().replace(",", "")
+            number_match = re.fullmatch(
+                r"(?P<number>\d+(?:\.\d+)?)(?P<suffix>[kKmMgGtTpPeE]?)",
+                value,
+            )
+            if number_match is None:
+                raise ValueError(f"Invalid progress value: {value!r}")
+
+            suffix = number_match.group("suffix").lower()
+            multiplier = {
+                "": 1,
+                "k": 1_000,
+                "m": 1_000_000,
+                "g": 1_000_000_000,
+                "t": 1_000_000_000_000,
+                "p": 1_000_000_000_000_000,
+                "e": 1_000_000_000_000_000_000,
+            }[suffix]
+            return float(number_match.group("number")) * multiplier
+
+        completed = max(0, int(round(parse_scaled_number(current))))
+        total = max(
+            1,
+            int(round(parse_scaled_number(match.group("total")))),
+        )
         completed = min(completed, total)
         return TrainingProgress(completed=completed, total=total)
 
