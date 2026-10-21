@@ -146,6 +146,50 @@ def _validate_action_chunk(result: dict[str, Any]) -> np.ndarray:
     return np.ascontiguousarray(actions)
 
 
+def _timing_ms(result: dict[str, Any], section: str) -> float | None:
+    timing = result.get(section)
+    if not isinstance(timing, dict):
+        return None
+    value = timing.get("infer_ms")
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return None
+    if not math.isfinite(value) or value < 0:
+        return None
+    return float(value)
+
+
+def _read_policy_action_chunk(
+    policy: Any,
+    source: "CR3O6ObservationSource",
+    prompt: str,
+    *,
+    label: str = "Policy request",
+) -> np.ndarray:
+    """Read one observation, request a chunk, and report available timings."""
+    observation_started = time.perf_counter()
+    observation = source.read(prompt)
+    observation_ms = (time.perf_counter() - observation_started) * 1000
+
+    request_started = time.perf_counter()
+    response = policy.infer(observation)
+    round_trip_ms = (time.perf_counter() - request_started) * 1000
+    actions = _validate_action_chunk(response)
+
+    model_ms = _timing_ms(response, "policy_timing")
+    server_ms = _timing_ms(response, "server_timing")
+    model_text = f"{model_ms:.1f} ms" if model_ms is not None else "n/a"
+    server_text = f"{server_ms:.1f} ms" if server_ms is not None else "n/a"
+    LOGGER.info(
+        "%s timing: model=%s, server policy=%s, client round-trip=%.1f ms, observation=%.1f ms",
+        label,
+        model_text,
+        server_text,
+        round_trip_ms,
+        observation_ms,
+    )
+    return actions
+
+
 class CR3O6ObservationSource:
     """Read the camera, arm, and hand values expected by the trained policy."""
 
@@ -232,8 +276,9 @@ class ActionChunkController:
                 continue
             self.request_event.clear()
             try:
-                observation = self.source.read(self.prompt)
-                result = _validate_action_chunk(self.policy.infer(observation))
+                result = _read_policy_action_chunk(
+                    self.policy, self.source, self.prompt, label="Action chunk"
+                )
                 with self.lock:
                     self.result = result
                     self.request_in_flight = False
@@ -420,13 +465,17 @@ def main() -> int:
         source = CR3O6ObservationSource(hardware, robot, hand_api, cameras)
 
         if args.preview_only:
-            warmup = _validate_action_chunk(policy.infer(source.read(args.prompt)))
+            warmup = _read_policy_action_chunk(
+                policy, source, args.prompt, label="Preview warm-up"
+            )
             LOGGER.info("Preview inference succeeded; actions discarded. Shape=%s first=%s",
                         warmup.shape, np.round(warmup[0], 4).tolist())
             started = time.monotonic()
             while not args.duration_s or time.monotonic() - started < args.duration_s:
                 request_started = time.monotonic()
-                actions = _validate_action_chunk(policy.infer(source.read(args.prompt)))
+                actions = _read_policy_action_chunk(
+                    policy, source, args.prompt, label="Preview request"
+                )
                 LOGGER.info("Preview actions shape=%s first=%s", actions.shape,
                             np.round(actions[0], 4).tolist())
                 time.sleep(max(0.0, 0.5 - (time.monotonic() - request_started)))
@@ -447,7 +496,9 @@ def main() -> int:
         servo_opened = True
         _move_to_initial_position(robot, hand_api, args.initial_move_duration_s,
                                   args.max_joint_speed_rad_s)
-        warmup = _validate_action_chunk(policy.infer(source.read(args.prompt)))
+        warmup = _read_policy_action_chunk(
+            policy, source, args.prompt, label="Policy warm-up"
+        )
         LOGGER.info("Policy warmup succeeded: action chunk shape=%s", warmup.shape)
         controller = ActionChunkController(
             policy, source, robot, hand_api, args.prompt,

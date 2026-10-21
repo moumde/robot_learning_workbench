@@ -27,7 +27,7 @@ from core.openpi.cr3_o6.deploy_policy import (  # noqa: E402
     _load_hand_api,
     _move_to_initial_position,
     _patch_pymodbus_slave_argument,
-    _validate_action_chunk,
+    _read_policy_action_chunk,
 )
 from core.openpi.cr3_o6.replay_trajectory import (  # noqa: E402
     DEFAULT_FIRST_ACTION_MOVE_DURATION_S,
@@ -173,7 +173,9 @@ def _run_policy_task(
     prompt = task["prompt"].strip()
     duration_s = float(task["duration_s"])
     LOGGER.info("Starting PI05 task for %.2f s: %s", duration_s, prompt)
-    warmup = _validate_action_chunk(policy.infer(source.read(prompt)))
+    warmup = _read_policy_action_chunk(
+        policy, source, prompt, label="Policy warm-up"
+    )
     LOGGER.info("Policy warmup succeeded: action chunk shape=%s", warmup.shape)
     controller = ActionChunkController(
         policy,
