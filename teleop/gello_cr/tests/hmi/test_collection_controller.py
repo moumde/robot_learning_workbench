@@ -27,13 +27,55 @@ def show(page, dataset, state=WorkflowState.TELEOP_RUNNING):
     page.render(view, OperatorReadiness.from_mapping(ready), dataset)
 
 
-def test_finish_requires_an_explicit_result_and_submits_one_command(page):
+@pytest.mark.parametrize("outcome", ["success", "failure"])
+@pytest.mark.parametrize("recording", [True, False], ids=["recording", "pending"])
+def test_direct_result_buttons_finish_collection_in_one_click(page, outcome, recording):
     widget, requests = page
-    show(widget, {"episode_active": True, "session_active": True, "buffered_frames": 4})
-    assert not widget.episode_stop_button.isEnabled()
-    widget.outcome_combo.setCurrentIndex(widget.outcome_combo.findData("success"))
+    show(
+        widget,
+        {
+            "episode_active": recording,
+            "episode_pending": not recording,
+            "session_active": True,
+            "buffered_frames": 4,
+        },
+    )
+    button = widget.save_success_button if outcome == "success" else widget.save_failure_button
+    assert not button.isHidden()
+    assert button.isEnabled()
+    button.click()
+    assert requests == [(Command.FINISH_COLLECTION, {"outcome": outcome})]
+    assert not hasattr(widget, "outcome_combo")
+
+
+def test_home_controls_have_separate_motion_and_success_save_commands(page):
+    widget, requests = page
+    show(widget, {"episode_active": True, "buffered_frames": 4})
+    assert widget.return_home_button.isEnabled()
+    assert widget.episode_stop_button.text() == "回 HOME 并成功保存"
+    widget.return_home_button.click()
     widget.episode_stop_button.click()
-    assert requests == [(Command.FINISH_EPISODE, {"outcome": "success"})]
+    assert requests == [(Command.RETURN_HOME, None), (Command.HOME_AND_SAVE_EPISODE, None)]
+
+
+def test_teleop_start_uses_collection_command_and_can_resume_active_episode(page):
+    widget, requests = page
+    widget.task_edit.setText("pick")
+    widget.root_edit.setText("/data/captures")
+    show(widget, {}, WorkflowState.ROBOT_ENABLED)
+    assert widget.episode_start_button.isEnabled()
+    assert widget.episode_start_button.text() == "开始采集"
+    assert widget.episode_start_button.toolTip() == "启动遥操并开始录制"
+    widget.episode_start_button.click()
+    assert requests[-1] == (
+        Command.START_COLLECTION,
+        {"task": "pick", "description": "", "base_root": "/data/captures", "source": "teleop"},
+    )
+    show(widget, {"episode_active": True, "buffered_frames": 4}, WorkflowState.ROBOT_ENABLED)
+    assert widget.episode_start_button.text() == "重新开始遥操"
+    assert widget.episode_start_button.isEnabled()
+    widget.episode_start_button.click()
+    assert requests[-1] == (Command.START_TELEOP, None)
 
 
 def test_discard_recording_confirms_once_and_cancel_preserves_it(page, monkeypatch):
@@ -51,17 +93,21 @@ def test_discard_recording_confirms_once_and_cancel_preserves_it(page, monkeypat
     assert requests == [(Command.DISCARD_EPISODE, None)]
 
 
-def test_explicit_replay_capture_is_distinct_from_default_teleop(page):
+@pytest.mark.parametrize(
+    ("source", "state"),
+    [("replay", WorkflowState.REPLAY_RUNNING), ("point_move", WorkflowState.POINT_MOVE_RUNNING)],
+)
+def test_explicit_motion_capture_uses_legacy_start_without_teleop(page, source, state):
     widget, requests = page
     widget.task_edit.setText("pick")
     widget.root_edit.setText("/data/captures")
-    show(widget, {}, WorkflowState.REPLAY_RUNNING)
+    show(widget, {}, state)
     assert not widget.episode_start_button.isEnabled()
-    widget.recording_source_combo.setCurrentIndex(widget.recording_source_combo.findData("replay"))
+    widget.recording_source_combo.setCurrentIndex(widget.recording_source_combo.findData(source))
     assert widget.episode_start_button.isEnabled()
     widget.episode_start_button.click()
     assert requests[-1][0] is Command.START_EPISODE
-    assert requests[-1][1]["source"] == "replay"
+    assert requests[-1][1]["source"] == source
 
 
 def test_recorder_clock_metrics_and_save_receipt_are_not_hidden_in_details(page):

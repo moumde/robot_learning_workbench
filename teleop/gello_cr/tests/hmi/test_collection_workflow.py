@@ -37,7 +37,7 @@ def test_offline_guidance_explains_the_next_preparation_action(collection):
     assert "连接机器人" in page.preparation_hint.text()
     assert not page.start_teleop_button.isEnabled()
     assert not page.episode_start_button.isEnabled()
-    assert "采集来源" in page.episode_hint.text()
+    assert "连接机器人" in page.episode_hint.text()
 
 
 def test_missing_master_guidance_replaces_ready_message(collection):
@@ -66,11 +66,11 @@ def test_episode_controls_follow_recording_and_pending_lifecycle(collection):
     render(page, WorkflowState.TELEOP_RUNNING, **readiness)
     assert page.episode_start_button.isEnabled()
     assert not page.episode_start_button.isHidden()
-    assert page.episode_stop_button.isHidden()
-    assert page.save_success_button.isHidden()
+    assert not page.episode_stop_button.isEnabled()
+    assert not page.save_success_button.isEnabled()
     page.episode_start_button.click()
     assert submitted[-1] == (
-        Command.START_EPISODE,
+        Command.START_COLLECTION,
         {
             "task": "motor_pick",
             "description": "",
@@ -85,17 +85,14 @@ def test_episode_controls_follow_recording_and_pending_lifecycle(collection):
         {"episode_active": True, "buffered_frames": 30},
         **readiness,
     )
-    assert page.episode_start_button.isHidden()
+    assert not page.episode_start_button.isHidden()
+    assert not page.episode_start_button.isEnabled()
     assert not page.episode_stop_button.isHidden()
     assert "REC" in page.episode_headline.text()
     assert "正在录制" in page.preparation_hint.text()
-    assert not page.episode_stop_button.isEnabled()
-    page.episode_stop_button.click()
-    assert len(submitted) == 1
-    page.outcome_combo.setCurrentIndex(page.outcome_combo.findData("success"))
     assert page.episode_stop_button.isEnabled()
     page.episode_stop_button.click()
-    assert submitted[-1] == (Command.FINISH_EPISODE, {"outcome": "success"})
+    assert submitted[-1] == (Command.HOME_AND_SAVE_EPISODE, None)
 
     render(
         page,
@@ -103,8 +100,9 @@ def test_episode_controls_follow_recording_and_pending_lifecycle(collection):
         {"episode_pending": True, "buffered_frames": 30},
         **readiness,
     )
-    assert page.episode_start_button.isHidden()
-    assert page.episode_stop_button.isHidden()
+    assert not page.episode_start_button.isHidden()
+    assert not page.episode_start_button.isEnabled()
+    assert not page.episode_stop_button.isEnabled()
     assert not page.save_success_button.isHidden()
     assert not page.save_failure_button.isHidden()
     assert not page.discard_button.isHidden()
@@ -112,7 +110,7 @@ def test_episode_controls_follow_recording_and_pending_lifecycle(collection):
     assert "保存" in page.preparation_hint.text()
     assert "成功" in page.episode_hint.text() and "失败" in page.episode_hint.text()
     page.save_success_button.click()
-    assert submitted[-1] == (Command.SAVE_SUCCESS, None)
+    assert submitted[-1] == (Command.FINISH_COLLECTION, {"outcome": "success"})
 
 
 @pytest.mark.parametrize("frames", [0, 30])
@@ -183,9 +181,8 @@ def test_recording_quality_warning_remains_visible_with_details_collapsed(collec
     assert "质量" in page.episode_hint.text()
     assert "详情" in page.episode_hint.text()
     assert page.episode_headline.property("state") == "warning"
-    assert not page.episode_stop_button.isEnabled()
-    page.outcome_combo.setCurrentIndex(page.outcome_combo.findData("failure"))
-    assert page.episode_stop_button.isEnabled()
+    assert page.save_failure_button.isEnabled()
+    assert not page.save_failure_button.isHidden()
 
 
 def test_ready_without_task_explains_setup_before_first_episode(collection):
@@ -277,6 +274,7 @@ def test_camera_frames_keep_episode_actions_in_minimum_window_viewport(recording
         "o6_connected": True,
         "cameras_running": True,
         "camera_frames_ready": True,
+        "capabilities": {"supports_home": True},
     }
     preview = {}
     service = ApplicationService(state_machine=WorkflowStateMachine(WorkflowState.TELEOP_RUNNING))
@@ -307,36 +305,82 @@ def test_camera_frames_keep_episode_actions_in_minimum_window_viewport(recording
         for _ in range(6):
             window.refresh_from_presenter()
             app.processEvents()
-        if recording:
-            page.outcome_combo.setCurrentIndex(page.outcome_combo.findData("success"))
-            app.processEvents()
         scroll = window.pages.currentWidget()
         assert scroll.horizontalScrollBar().maximum() == 0
         assert scroll.verticalScrollBar().maximum() == 0
         assert page.height() <= initial_height
-        targets = (
-            [page.outcome_combo, page.episode_stop_button, page.discard_button]
-            if recording
-            else [page.save_success_button, page.save_failure_button, page.discard_button]
-        )
+        targets = [page.save_success_button, page.save_failure_button, page.discard_button]
+        if recording:
+            targets += [page.return_home_button, page.episode_stop_button]
+        assert page.collection_operations.width() == page.width()
+        assert page.collection_operations.y() > page.workspace_scroll.geometry().bottom()
+        assert page.collection_operations.parent() is page
+        assert not page.episode_start_button.isHidden()
+        assert not page.episode_start_button.isEnabled()
         for button in targets:
             assert button.isVisibleTo(window)
             assert button.isEnabled()
             position = button.mapTo(scroll.viewport(), QPoint())
             assert 0 <= position.y() < position.y() + button.height() <= scroll.viewport().height()
             assert 0 <= position.x() < position.x() + button.width() <= scroll.viewport().width()
+        operations_position = page.collection_operations.pos()
+        page.workspace_scroll.verticalScrollBar().setValue(
+            page.workspace_scroll.verticalScrollBar().maximum()
+        )
+        app.processEvents()
+        assert page.collection_operations.pos() == operations_position
         for image, metrics in zip(
             (page.base_preview, page.wrist_preview, page.roi_preview),
             page.camera_metrics,
             strict=True,
         ):
-            image_position = image.mapTo(scroll.viewport(), QPoint())
-            metrics_position = metrics.mapTo(scroll.viewport(), QPoint())
+            workspace = page.workspace_scroll.widget()
+            image_position = image.mapTo(workspace, QPoint())
+            metrics_position = metrics.mapTo(workspace, QPoint())
             assert image_position.y() + image.height() <= metrics_position.y()
-            assert metrics_position.y() + metrics.height() <= scroll.viewport().height()
+            assert metrics_position.y() + metrics.height() <= workspace.height()
     finally:
         presenter.close()
         window._shutdown_complete = True
         window.close()
         delete(window)
         app.processEvents()
+
+
+def test_unsupported_home_controls_are_hidden_and_busy_keeps_independent_home(collection):
+    page, _ = collection
+    readiness = {
+        "robot_connected": True,
+        "servo_state": "on",
+        "master_connected": True,
+        "o6_connected": True,
+        "camera_frames_ready": True,
+        "robot_profile": "installed",
+    }
+    render(
+        page,
+        WorkflowState.TELEOP_RUNNING,
+        {"episode_active": True, "buffered_frames": 4},
+        capabilities={"supports_home": False},
+        **readiness,
+    )
+    assert page.return_home_button.isHidden()
+    assert page.episode_stop_button.isHidden()
+    render(
+        page,
+        WorkflowState.TELEOP_RUNNING,
+        {"episode_active": True, "buffered_frames": 4},
+        busy=True,
+        capabilities={"supports_home": True},
+        **readiness,
+    )
+    assert not page.return_home_button.isHidden()
+    assert page.return_home_button.isEnabled()
+    for button in (
+        page.episode_start_button,
+        page.episode_stop_button,
+        page.save_success_button,
+        page.save_failure_button,
+        page.discard_button,
+    ):
+        assert not button.isEnabled()

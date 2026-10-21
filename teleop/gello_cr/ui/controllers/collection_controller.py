@@ -27,9 +27,7 @@ class CollectionController:
         self._send = submit
         self._context = None
         self._setup_context = None
-        self._was_recording = False
         self._last_receipt = None
-        page.outcome_combo.currentIndexChanged.connect(self.refresh)
         page.recording_source_combo.currentIndexChanged.connect(self.refresh)
         page.task_edit.textChanged.connect(self.refresh)
         page.root_edit.textChanged.connect(self.refresh)
@@ -41,16 +39,22 @@ class CollectionController:
     def submit(self, command, payload=None):
         page = self.page
         if command is Command.START_EPISODE:
-            payload = {
-                **(payload or {}),
-                "source": page.recording_source_combo.currentData() or "teleop",
-            }
-        elif command is Command.STOP_EPISODE:
-            outcome = page.outcome_combo.currentData()
-            if outcome not in ("success", "failure"):
-                page.episode_hint.setText("请先选择本段结果，再完成并保存。")
-                return
-            command, payload = Command.FINISH_EPISODE, {"outcome": outcome}
+            source = page.recording_source_combo.currentData() or "teleop"
+            if source == "teleop":
+                view = self._context[0] if self._context else None
+                if (
+                    view
+                    and view.episode_active
+                    and view.workflow_state is WorkflowState.ROBOT_ENABLED
+                ):
+                    command, payload = Command.START_TELEOP, None
+                else:
+                    command, payload = (
+                        Command.START_COLLECTION,
+                        {**(payload or {}), "source": source},
+                    )
+            else:
+                payload = {**(payload or {}), "source": source}
         elif command is Command.DISCARD_EPISODE:
             dataset = self._context[2] if self._context else {}
             name = episode_label(dataset, active=True)
@@ -71,11 +75,6 @@ class CollectionController:
         self._context = view, readiness, dataset, busy
         page = self.page
         recording, pending = view.episode_active, view.episode_pending
-        if recording and not self._was_recording:
-            page.outcome_combo.blockSignals(True)
-            page.outcome_combo.setCurrentIndex(0)
-            page.outcome_combo.blockSignals(False)
-        self._was_recording = recording
         for button, command in (
             (page.connect_button, Command.CONNECT),
             (page.disconnect_button, Command.DISCONNECT),
@@ -104,22 +103,34 @@ class CollectionController:
         form_ready = view.dataset_session_active or bool(
             page.task_edit.text().strip() and page.root_edit.text().strip()
         )
-        page.episode_start_button.setEnabled(source_allowed and form_ready and not busy)
-        page.episode_start_button.setVisible(not (recording or pending))
-        page.episode_stop_button.setVisible(recording)
-        page.episode_stop_button.setText("完成本段并保存")
-        outcome = page.outcome_combo.currentData()
-        finish_permission = view.actions.get(
-            Command.SAVE_SUCCESS if outcome == "success" else Command.SAVE_FAILURE, False
+        resume_teleop = (
+            recording and source == "teleop" and view.workflow_state is WorkflowState.ROBOT_ENABLED
         )
+        start_allowed = (
+            view.actions.get(Command.START_TELEOP, False)
+            if resume_teleop
+            else source_allowed and form_ready and not (recording or pending)
+        )
+        page.episode_start_button.setText("重新开始遥操" if resume_teleop else "开始采集")
+        page.episode_start_button.setVisible(True)
+        page.episode_start_button.setEnabled(start_allowed and not busy)
+        supports_home = not readiness.robot_profile or readiness.capabilities.supports_home
+        page.return_home_button.setVisible(supports_home)
+        page.return_home_button.setEnabled(view.actions.get(Command.RETURN_HOME, False))
+        home_reason = view.action_reasons.get(Command.RETURN_HOME, "")
+        page.return_home_button.setToolTip(home_reason or "返回 HOME；当前 Episode 继续录制")
+        page.episode_stop_button.setVisible(supports_home)
         page.episode_stop_button.setEnabled(
-            recording and outcome in ("success", "failure") and finish_permission and not busy
+            recording and view.actions.get(Command.HOME_AND_SAVE_EPISODE, False) and not busy
         )
-        page.outcome_combo.setVisible(recording)
-        page.outcome_combo.setEnabled(recording and not busy)
-        for button in (page.save_success_button, page.save_failure_button):
-            button.setVisible(pending)
-        page.discard_button.setVisible(recording or pending)
+        page.episode_stop_button.setToolTip(
+            "正在处理上一项请求，请稍候。"
+            if busy
+            else view.action_reasons.get(Command.HOME_AND_SAVE_EPISODE)
+            or "回到 HOME，确认到位后成功保存本段。"
+        )
+        for button in (page.save_success_button, page.save_failure_button, page.discard_button):
+            button.setVisible(True)
         page._role(page.discard_button, "danger")
 
         editable = not (
@@ -303,7 +314,7 @@ class CollectionController:
                 hint = "请选择成功或失败保存，或明确丢弃后继续。"
         elif view.episode_active:
             headline, severity = "● REC · 正在采集并写入批次", "success"
-            hint = "选择本段结果后完成并保存；停止运动不会自动保存本段。"
+            hint = "回 HOME 并成功保存，或直接选择成功保存、失败保存；独立回 HOME 后继续录制。"
         elif view.workflow_state in (WorkflowState.FAULT, WorkflowState.ESTOP):
             headline, hint, severity = (
                 "故障待处理",
@@ -320,8 +331,8 @@ class CollectionController:
             headline, hint = "设置本次采集任务", "填写任务名称和保存目录，或继续未完成批次。"
         else:
             headline, hint = (
-                "可以开始录制",
-                "格式和任务在采集会话期间锁定；开始后按本段结果完成或丢弃。",
+                "可以开始采集",
+                "开始采集后，回 HOME 并成功保存，或直接选择成功保存、失败保存。",
             )
         if view.quality_needs_review:
             hint += " 本段采集质量需复核，展开采集详情查看。"
@@ -329,8 +340,17 @@ class CollectionController:
                 severity = "warning"
         page.episode_headline.setText(headline)
         page.episode_hint.setText(hint)
-        page.episode_start_button.setToolTip(hint)
-        page.episode_stop_button.setToolTip("请选择明确结果，再完成本段并保存。")
+        if page.episode_start_button.isEnabled():
+            start_hint = (
+                "继续当前 Episode 的遥操，不新建 Episode"
+                if view.episode_active
+                else "启动遥操并开始录制"
+                if source == "teleop"
+                else "录制所选运动来源"
+            )
+        else:
+            start_hint = hint
+        page.episode_start_button.setToolTip(start_hint)
         set_state(page.episode_headline, severity)
         set_state(page.episode_state_panel, severity)
         text = f"采样来源 {source} · 配置 {quality.get('configured_fps', 0):g} FPS\n跳过采样槽 {quality.get('skipped_samples', 0)} · 迟帧 {quality.get('late_frames', 0)}\n相机重复 {quality.get('reused_camera_frames', {})}\n实际保存：{dataset.get('root', '')}"

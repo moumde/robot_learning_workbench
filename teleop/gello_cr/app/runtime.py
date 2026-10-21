@@ -142,9 +142,7 @@ class TeleopRuntime:
         self.capture_snapshot = CaptureSnapshot(self)
         self.list_trajectories()
         self.point_motion = PointMotionService(self)
-        self.teleop_controller = (
-            teleop_controller_factory or _default_teleop_controller
-        )(
+        self.teleop_controller = (teleop_controller_factory or _default_teleop_controller)(
             store,
             roarm,
             o6,
@@ -270,7 +268,8 @@ class TeleopRuntime:
 
     def _event(self, level: str, message: str, *, domain="teleop") -> None:
         getattr(logging.getLogger(f"workbench.{domain}"), level)(
-            message, exc_info=level == "error" and sys.exc_info()[0] is not None,
+            message,
+            exc_info=level == "error" and sys.exc_info()[0] is not None,
         )
         self.events.put((level, message))
 
@@ -368,6 +367,9 @@ class TeleopRuntime:
 
     def start_follow(self) -> None:
         return self.teleop_service.start_follow()
+
+    def wait_follow_ready(self, timeout=3.0) -> None:
+        return self.teleop_service.wait_follow_ready(timeout)
 
     def start_external_control(self, controller, stop_generation: int, *, motion_view=None) -> None:
         """Reserve the existing motion producer slot for the DAgger arbiter."""
@@ -472,7 +474,9 @@ class TeleopRuntime:
             self._set_state("fault", str(exc))
             raise
 
-    def stop_follow(self, reason: str = "人工停止") -> None:
+    def stop_follow(self, reason: str = "人工停止", *, expected_started_at=None):
+        if expected_started_at is not None:
+            return self.teleop_service.stop_follow_session(expected_started_at)
         if self.state == "point_move":
             self.point_motion.stop()
             return
@@ -556,6 +560,7 @@ class TeleopRuntime:
                 "motion": {
                     "source": motion.source.name if motion.source is not None else None,
                     "running": motion.running,
+                    "started_at": motion.started_at,
                 },
             }
 

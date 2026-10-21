@@ -35,7 +35,10 @@ class CollectionPage(QWidget):
             self._ui.collection_stage_status_labels_2,
             self._ui.collection_stage_status_labels_3,
         ]
+        self.workspace_scroll = self._ui.collection_workspace_scroll
         self.workspace_splitter = self._ui.collection_workspace_splitter
+        self.collection_operations = self._ui.collection_operations
+        self.return_home_button = self._ui.collection_return_home_button
         self.control_source = self._ui.collection_control_source
         self.camera_hint = self._ui.collection_camera_hint
         self.base_preview = self._ui.collection_base_preview
@@ -89,7 +92,6 @@ class CollectionPage(QWidget):
         self.dagger_content = self._ui.collection_dagger_content
         self.robot_selector = self._ui.collection_robot_selector
         self.episode_id_label = self._ui.collection_episode_id_label
-        self.outcome_combo = self._ui.collection_outcome_combo
         self.save_receipt = self._ui.collection_save_receipt
         self.fps_metric = self._ui.collection_fps_metric
         self.dropped_metric = self._ui.collection_dropped_metric
@@ -97,8 +99,6 @@ class CollectionPage(QWidget):
         self.resume_dataset_button = self._ui.collection_resume_dataset_button
         self._ui.collection_robot_selector.setItemData(0, "cr3a_o6")
         self._ui.collection_control_source.setItemData(0, "gello")
-        self._ui.collection_outcome_combo.setItemData(1, "success")
-        self._ui.collection_outcome_combo.setItemData(2, "failure")
         self._ui.collection_recording_source_combo.setItemData(0, "teleop")
         self._ui.collection_recording_source_combo.setItemData(1, "replay")
         self._ui.collection_recording_source_combo.setItemData(2, "point_move")
@@ -123,14 +123,22 @@ class CollectionPage(QWidget):
             (self.start_cameras_button, Command.START_CAMERAS),
             (self.stop_cameras_button, Command.STOP_CAMERAS),
             (self.finalize_dataset_button, Command.FINALIZE_DATASET),
-            (self.episode_stop_button, Command.STOP_EPISODE),
-            (self.save_success_button, Command.SAVE_SUCCESS),
-            (self.save_failure_button, Command.SAVE_FAILURE),
+            (self.return_home_button, Command.RETURN_HOME),
+            (self.episode_stop_button, Command.HOME_AND_SAVE_EPISODE),
             (self.discard_button, Command.DISCARD_EPISODE),
             (self.dagger_toggle_button, Command.TOGGLE_INTERVENTION),
             (self.dagger_stop_button, Command.STOP_DAGGER),
         ):
             button.clicked.connect(lambda _checked=False, cmd=command: self._submit(cmd))
+        for button, outcome in (
+            (self.save_success_button, "success"),
+            (self.save_failure_button, "failure"),
+        ):
+            button.clicked.connect(
+                lambda _checked=False, result=outcome: self._submit(
+                    Command.FINISH_COLLECTION, {"outcome": result}
+                )
+            )
         self.dataset_format.currentIndexChanged.connect(
             lambda _: self._submit(
                 Command.SELECT_DATASET_FORMAT, {"format": self.dataset_format.currentData()}

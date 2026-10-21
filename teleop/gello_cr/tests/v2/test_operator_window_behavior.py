@@ -192,7 +192,7 @@ def test_episode_start_recovers_after_camera_frames_resume(window, saved):
     assert '暂不能开始' not in widget.collection.episode_hint.text()
     assert widget.collection.saved_metric.text() == str(saved)
     widget.collection.episode_start_button.click()
-    assert [r.command for r in requests] == [Command.START_EPISODE]
+    assert [r.command for r in requests] == [Command.START_COLLECTION]
 
 
 def test_space_toggles_twice_only_in_dagger_and_ignores_key_repeat(window):

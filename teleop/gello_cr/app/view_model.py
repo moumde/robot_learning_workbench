@@ -166,10 +166,14 @@ def build_application_view_model(
             (Command.SAVE_FAILURE, "failure"),
         ):
             permissions[command] = operation_permission(
-                Command.FINISH_EPISODE, context, {"outcome": outcome}
+                Command.FINISH_COLLECTION, context, {"outcome": outcome}
             )
     sources = {
-        source: operation_permission(Command.START_EPISODE, context, {"source": source})
+        source: operation_permission(
+            Command.START_COLLECTION if source == "teleop" else Command.START_EPISODE,
+            context,
+            {"source": source},
+        )
         for source in RECORDING_SOURCES
     }
     actions = {command: permission.allowed for command, permission in permissions.items()}
@@ -262,6 +266,9 @@ def command_activity(command):
         Command.START_CAMERAS: "正在启动相机",
         Command.START_TELEOP: "正在启动遥操",
         Command.START_EPISODE: "正在开始记录",
+        Command.START_COLLECTION: "正在启动遥操并开始采集",
+        Command.FINISH_COLLECTION: "正在停止遥操并保存 Episode",
+        Command.HOME_AND_SAVE_EPISODE: "正在回 HOME，到位后保存成功 Episode",
         Command.FINISH_EPISODE: "正在结束并保存 Episode",
         Command.SAVE_SUCCESS: "正在保存成功 Episode",
         Command.SAVE_FAILURE: "正在保存失败 Episode",

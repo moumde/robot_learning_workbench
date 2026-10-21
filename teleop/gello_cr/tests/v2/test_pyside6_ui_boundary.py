@@ -43,13 +43,6 @@ def test_window_polls_presenter_with_qtimer() -> None:
     assert "refresh_from_presenter" in source
 
 
-def test_window_exposes_stop_episode_command() -> None:
-    source = _source("pages/collection.py")
-
-    assert "Command.STOP_EPISODE" in source
-    assert "episode_stop_button" in source
-
-
 def test_preview_explicitly_contains_no_hardware_backend() -> None:
     source = implementation_path("teleop/gello_cr/examples/preview_collection.py").read_text(encoding="utf-8")
 

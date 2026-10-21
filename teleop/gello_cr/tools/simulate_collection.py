@@ -272,9 +272,9 @@ class SimulationRun:
             message="Teleop did not publish its first accepted target",
         )
 
-    def finish(self, *, outcome="success", label="healthy"):
+    def finish(self, *, outcome="success", label="healthy", action=Command.FINISH_EPISODE):
         before = self.recorder.snapshot()
-        self.command(Command.FINISH_EPISODE, {"outcome": outcome, "notes": "SIMULATION " + label})
+        self.command(action, {"outcome": outcome, "notes": "SIMULATION " + label}, timeout=30)
         after = self.recorder.snapshot()
         self.report["episodes"].append(
             {
@@ -352,8 +352,23 @@ class SimulationRun:
             any(item["name"] == "automatic teleop" for item in self.engine.list_trajectories()),
             "Coupled trajectory recording is saved to the shared trajectory store",
         )
-        self.start_follow()
         self.command(Command.CREATE_DATASET, self.payload)
+        self.rig.motion_enabled = False
+        self.command(Command.START_COLLECTION, self.payload)
+        self.rig.motion_enabled = True
+        self.run_for(1, healthy=True)
+        self.check(
+            self.engine.state == "following" and self.recorder.snapshot()["episode_active"],
+            "Start collection starts teleop and Dataset Episode together",
+        )
+        self.rig.motion_enabled = False
+        self.finish(label="one-click HOME and save", action=Command.HOME_AND_SAVE_EPISODE)
+        self.check(
+            self.engine.state == "idle" and self.service.state is WorkflowState.ROBOT_ENABLED
+            and not self.recorder.snapshot()["episode_active"],
+            "HOME and save confirms arrival, saves Episode and leaves motion stopped",
+        )
+        self.start_follow()
         healthy_start = time.monotonic()
         sampling_start = self.rig.sample_count
         sends_start = self.rig.api.send_count

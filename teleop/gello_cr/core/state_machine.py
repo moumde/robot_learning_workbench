@@ -34,6 +34,9 @@ class Command(Enum):
     START_TELEOP = auto()
     STOP_TELEOP = auto()
     START_EPISODE = auto()
+    START_COLLECTION = auto()
+    FINISH_COLLECTION = auto()
+    HOME_AND_SAVE_EPISODE = auto()
     STOP_EPISODE = auto()
     FINISH_EPISODE = auto()
     FINALIZE_DATASET = auto()
@@ -183,6 +186,21 @@ class WorkflowStateMachine:
             return False
         if command in _AUXILIARY:
             return True  # Concrete handlers enforce writer/session preconditions.
+        if command is Command.START_COLLECTION:
+            return (
+                source == "teleop"
+                and self.state in (WorkflowState.ROBOT_ENABLED, WorkflowState.TELEOP_RUNNING)
+                and self.recording_state is RecordingState.IDLE
+            )
+        if command is Command.FINISH_COLLECTION:
+            return self.state is not WorkflowState.RETURNING_HOME and self.recording_state in (
+                RecordingState.RECORDING,
+                RecordingState.PENDING,
+            )
+        if command is Command.HOME_AND_SAVE_EPISODE:
+            return self.recording_state is RecordingState.RECORDING and self.can(
+                Command.RETURN_HOME
+            )
         if command is Command.START_EPISODE:
             return (
                 self.state
