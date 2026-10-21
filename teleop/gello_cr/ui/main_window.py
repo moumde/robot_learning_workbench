@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from datetime import datetime
+from enum import IntEnum
 
 from PySide6.QtCore import QTimer, Signal
 from PySide6.QtGui import QKeySequence, QShortcut
@@ -17,13 +18,20 @@ from .camera_preview import CameraPreviewRenderer
 from .command_port import CommandRequest
 from .emergency_shortcut import EmergencyStopFilter
 from .generated.ui_main_window import Ui_OperatorMainWindow
+from .motion_workspace import MotionWorkspace
 from .pages.collection import CollectionPage
 from .pages.dataset_manager import DatasetManagerPage
 from .pages.robot_status import RobotStatusPage
-from .planning_panel import PlanningPanel
 from .status_presenter import render_status
 from .theme import WORKBENCH_STYLESHEET, set_state
-from .trajectory_panel import TrajectoryPanel
+
+
+class WorkbenchPage(IntEnum):
+    COLLECTION = 0
+    MOTION = 1
+    DATASETS = 2
+    ROBOT = 3
+    SETTINGS = 4
 
 
 class OperatorMainWindow(QMainWindow):
@@ -80,14 +88,14 @@ class OperatorMainWindow(QMainWindow):
         self.brand_version.setText(f"ROBOT LEARNING  /  v{__version__}")
         self.collection = CollectionPage(self._submit, self._ui.shell_collection)
         self._preview_renderer = CameraPreviewRenderer(self.collection)
-        self.trajectory_panel = TrajectoryPanel(self._submit, self._ui.shell_trajectory_panel)
-        self.planning_panel = PlanningPanel(self._submit, self._ui.shell_planning_panel)
+        self.motion_workspace = MotionWorkspace(self._submit, self._ui.shell_motion_workspace)
+        self.trajectory_panel = self.motion_workspace.trajectory_panel
+        self.planning_panel = self.motion_workspace.planning_panel
         self.dataset_page = DatasetManagerPage(self._submit, self._ui.shell_dataset_page)
         self.robot_page = RobotStatusPage(self._submit, self._ui.shell_robot_page)
         for host, page in (
             (self._ui.shell_collection, self.collection),
-            (self._ui.shell_trajectory_panel, self.trajectory_panel),
-            (self._ui.shell_planning_panel, self.planning_panel),
+            (self._ui.shell_motion_workspace, self.motion_workspace),
             (self._ui.shell_dataset_page, self.dataset_page),
             (self._ui.shell_robot_page, self.robot_page),
         ):
@@ -100,8 +108,12 @@ class OperatorMainWindow(QMainWindow):
             (self.estop_button, Command.EMERGENCY_STOP),
         ):
             button.clicked.connect(lambda checked=False, cmd=command: self._submit(cmd))
-        self.recovery_button.clicked.connect(lambda: self.navigation.setCurrentRow(3))
-        self.collection.manage_datasets.connect(lambda: self.navigation.setCurrentRow(3))
+        self.recovery_button.clicked.connect(
+            lambda: self.navigation.setCurrentRow(WorkbenchPage.DATASETS)
+        )
+        self.collection.manage_datasets.connect(
+            lambda: self.navigation.setCurrentRow(WorkbenchPage.DATASETS)
+        )
         self.log_toggle.toggled.connect(self.event_log.setVisible)
         self.log_toggle.toggled.connect(
             lambda expanded: self.log_toggle.setText("运行日志  ▴" if expanded else "运行日志  ▾")
@@ -129,14 +141,13 @@ class OperatorMainWindow(QMainWindow):
             self.workflow_detail.setText(
                 (
                     "准备设备，观察画面，记录每一次有效操作",
-                    "记录示教轨迹，预览并执行回放",
-                    "先规划预览，再明确执行目标运动",
+                    "录制示教、预览回放、规划走点，共用同一个轨迹库",
                     "浏览数据集，校验质量，处理未完成批次",
                     "查看设备反馈与故障，明确复位后保持停止",
                     "设备连接、运动与采集参数",
                 )[index]
             )
-        if index == 5 and self.settings_editor is None:
+        if index == WorkbenchPage.SETTINGS and self.settings_editor is None:
             self._open_settings()
             self.refresh_from_presenter()
 
@@ -210,8 +221,7 @@ class OperatorMainWindow(QMainWindow):
             self.collection.task_edit.text(), view.dataset_format
         )
         self.collection.render(view, readiness, dataset, busy)
-        self.trajectory_panel.render(frame.trajectory, view, readiness, busy)
-        self.planning_panel.render(frame.planning, view, busy)
+        self.motion_workspace.render(frame.trajectory, frame.planning, view, readiness, busy)
         self.dataset_page.render(frame.catalog, dataset, busy)
         if not self.dataset_page.root_edit.text():
             self.dataset_page.root_edit.setText(self.collection.root_edit.text())
@@ -281,7 +291,7 @@ class OperatorMainWindow(QMainWindow):
             view = frame.view_model
             if frame.dataset.get("partial_episodes"):
                 self.notification.setText("请先在数据集管理处理 Partial，或保留当前批次稍后继续。")
-                self.navigation.setCurrentRow(3)
+                self.navigation.setCurrentRow(WorkbenchPage.DATASETS)
                 return
             trajectory = frame.trajectory
             save_pending = (

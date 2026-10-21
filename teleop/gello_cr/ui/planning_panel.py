@@ -6,7 +6,7 @@ import math
 
 from PySide6.QtWidgets import QTableWidgetItem, QWidget
 
-from teleop.gello_cr.core.state_machine import Command, WorkflowState
+from teleop.gello_cr.core.state_machine import Command, MotionState, WorkflowState
 
 from .generated.ui_planning_page import Ui_PlanningPanel
 
@@ -58,6 +58,12 @@ class PlanningPanel(QWidget):
         self.save_button = self._ui.planning_save_button
         self.status_label = self._ui.planning_status_label
         self.preview_text = self._ui.planning_preview_text
+        self.editor_tabs = self._ui.planning_editor_tabs
+        self.parameter_panel = self._ui.planning_parameter_panel
+        self.waypoint_panel = self._ui.planning_waypoint_panel
+        self.action_bar = self._ui.planning_action_bar
+        self.result_state = self._ui.planning_result_state
+        self.result_summary = self._ui.planning_result_summary
         self._ui.planning_mode_combo.setItemData(0, "joint")
         self._ui.planning_mode_combo.setItemData(1, "tcp_ptp")
         self._ui.planning_mode_combo.setItemData(2, "tcp_linear")
@@ -101,7 +107,17 @@ class PlanningPanel(QWidget):
             strict=True,
         ):
             label.setText(text)
-        self.table.setVisible(self.mode_combo.currentData() == "waypoints")
+        waypoints = self.mode_combo.currentData() == "waypoints"
+        self.waypoint_panel.setVisible(waypoints)
+        self.table.setVisible(waypoints)
+        self.add_current_button.setVisible(waypoints)
+        self._ui.planning_target_group.setTitle("目标关节" if joint else "目标 TCP")
+        self._ui.planning_target_help.setText(
+            "Joint：输入六个关节角，单位 °。"
+            if joint
+            else "TCP：位置单位 mm，姿态单位 °。"
+            + ("\n将目标添加到列表，再按行编辑运动方式、速度与停留。" if waypoints else "")
+        )
         self._changed()
 
     def _read(self, add):
@@ -249,12 +265,57 @@ class PlanningPanel(QWidget):
         self.status_label.setText(status)
         self._update_enabled()
 
+    def _update_result_summary(self):
+        preview = self._snapshot.get("preview") or {}
+        metrics = self._snapshot.get("metrics") or {}
+        status = self._snapshot.get("status", "IDLE")
+        error = self._snapshot.get("error")
+        if error:
+            label = "规划失败" if status == "PLANNING_FAILED" else "错误"
+            self.result_state.setText(f"{label}：{error}")
+        elif status == "PLANNING_FAILED":
+            self.result_state.setText("规划失败 · 请查看规划结果")
+        elif status == "PLANNING":
+            self.result_state.setText("正在生成规划…")
+        elif preview and self._planned_revision != self._revision:
+            self.result_state.setText("输入已修改，请重新规划")
+        elif preview:
+            self.result_state.setText(
+                "正在执行规划" if self._snapshot.get("running") else "规划结果已生成"
+            )
+        else:
+            self.result_state.setText("等待生成规划")
+        if preview:
+            summary = f"{metrics.get('frame_count', 0)} 帧 · {metrics.get('duration_s', 0):.3f} s"
+            path_length = metrics.get("path_length_tcp_m")
+            if path_length is not None:
+                summary += f" · TCP 路径 {path_length:.4g} m"
+            self.result_summary.setText(summary)
+        else:
+            self.result_summary.setText("编辑目标后生成规划，可查看实际帧数、时长与端点。")
+        unavailable = preview.get("collision_checking", "unavailable") == "unavailable"
+        self._ui.planning_collision_notice.setText(
+            "路径碰撞预检：未实现（未验证自碰撞或环境障碍物）。"
+            if unavailable
+            else "路径碰撞预检：状态未确认（未确认自碰撞或环境障碍物检查）。"
+        )
+
     def _update_enabled(self):
+        self._update_result_summary()
         if self._context is None:
             return
         view, busy = self._context
         running = (
-            self._snapshot.get("running") or view.workflow_state is WorkflowState.POINT_MOVE_RUNNING
+            self._snapshot.get("running")
+            or view.workflow_state
+            in (
+                WorkflowState.POINT_MOVE_RUNNING,
+                WorkflowState.REPLAY_RUNNING,
+                WorkflowState.RETURNING_HOME,
+                WorkflowState.DAGGER_RUNNING,
+            )
+            or view.motion_state
+            in (MotionState.REPLAY, MotionState.POINT_MOVE, MotionState.HOME, MotionState.POLICY)
         )
         editable = not busy and not running
         waypoints = self.mode_combo.currentData() == "waypoints"
@@ -283,6 +344,7 @@ class PlanningPanel(QWidget):
                 editable and waypoints and (available or button is not self.add_current_button)
             )
         offline = view.robot_state.name == "OFFLINE"
+        self._ui.planning_offline_panel.setVisible(offline)
         self.offline_start.setVisible(offline)
         self.offline_start.setEnabled(editable)
         self.offline_start.setPlaceholderText("离线起点 J1–J6，单位 °")

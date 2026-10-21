@@ -180,12 +180,7 @@
          </item>
          <item>
           <property name="text">
-           <string>轨迹与回放</string>
-          </property>
-         </item>
-         <item>
-          <property name="text">
-           <string>精确走点</string>
+           <string>轨迹与走点</string>
           </property>
          </item>
          <item>
@@ -908,71 +903,27 @@
              </layout>
             </widget>
            </widget>
-           <widget class="QScrollArea" name="shell_ScrollArea_2">
-            <property name="visible">
-             <bool>false</bool>
-            </property>
+           <widget class="QWidget" name="shell_motion_workspace">
+            <layout class="QVBoxLayout" name="shell_motion_workspace_layout">
+             <property name="leftMargin">
+              <number>0</number>
+             </property>
+             <property name="topMargin">
+              <number>0</number>
+             </property>
+             <property name="rightMargin">
+              <number>0</number>
+             </property>
+             <property name="bottomMargin">
+              <number>0</number>
+             </property>
+            </layout>
             <property name="sizePolicy">
-             <sizepolicy hsizetype="Expanding" vsizetype="Expanding">
-              <horstretch>0</horstretch>
-              <verstretch>0</verstretch>
+             <sizepolicy hsizetype="Expanding" vsizetype="Ignored">
+              <horstretch>1</horstretch>
+              <verstretch>1</verstretch>
              </sizepolicy>
             </property>
-            <property name="widgetResizable">
-             <bool>true</bool>
-            </property>
-            <property name="frameShape">
-             <enum>QFrame::StyledPanel</enum>
-            </property>
-            <widget class="QWidget" name="shell_trajectory_panel">
-             <layout class="QVBoxLayout" name="shell_trajectory_panel_layout">
-              <property name="leftMargin">
-               <number>0</number>
-              </property>
-              <property name="topMargin">
-               <number>0</number>
-              </property>
-              <property name="rightMargin">
-               <number>0</number>
-              </property>
-              <property name="bottomMargin">
-               <number>0</number>
-              </property>
-             </layout>
-            </widget>
-           </widget>
-           <widget class="QScrollArea" name="shell_ScrollArea_3">
-            <property name="visible">
-             <bool>false</bool>
-            </property>
-            <property name="sizePolicy">
-             <sizepolicy hsizetype="Expanding" vsizetype="Expanding">
-              <horstretch>0</horstretch>
-              <verstretch>0</verstretch>
-             </sizepolicy>
-            </property>
-            <property name="widgetResizable">
-             <bool>true</bool>
-            </property>
-            <property name="frameShape">
-             <enum>QFrame::StyledPanel</enum>
-            </property>
-            <widget class="QWidget" name="shell_planning_panel">
-             <layout class="QVBoxLayout" name="shell_planning_panel_layout">
-              <property name="leftMargin">
-               <number>0</number>
-              </property>
-              <property name="topMargin">
-               <number>0</number>
-              </property>
-              <property name="rightMargin">
-               <number>0</number>
-              </property>
-              <property name="bottomMargin">
-               <number>0</number>
-              </property>
-             </layout>
-            </widget>
            </widget>
            <widget class="QScrollArea" name="shell_ScrollArea_4">
             <property name="visible">

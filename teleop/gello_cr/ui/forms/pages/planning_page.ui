@@ -1,835 +1,328 @@
-<?xml version='1.0' encoding='utf-8'?>
+<?xml version="1.0" encoding="UTF-8"?>
 <ui version="4.0">
  <class>PlanningPanel</class>
  <widget class="QWidget" name="PlanningPanel">
-  <property name="geometry">
-   <rect>
-    <x>0</x>
-    <y>0</y>
-    <width>640</width>
-    <height>480</height>
-   </rect>
-  </property>
-  <property name="sizePolicy">
-   <sizepolicy hsizetype="Preferred" vsizetype="Preferred">
-    <horstretch>0</horstretch>
-    <verstretch>0</verstretch>
-   </sizepolicy>
-  </property>
-  <layout class="QGridLayout" name="planning_GridLayout_1" columnstretch="0,0" rowstretch="0,0,0,0,0,0,0">
-   <property name="leftMargin">
-    <number>6</number>
-   </property>
-   <property name="topMargin">
-    <number>6</number>
-   </property>
-   <property name="rightMargin">
-    <number>6</number>
-   </property>
-   <property name="bottomMargin">
-    <number>6</number>
-   </property>
-   <property name="horizontalSpacing">
-    <number>6</number>
-   </property>
-   <property name="verticalSpacing">
-    <number>6</number>
-   </property>
-   <item row="0" column="0" rowspan="1" colspan="2">
-    <layout class="QHBoxLayout" name="planning_HBoxLayout_1" stretch="0,0,0,0,0,0">
-     <property name="leftMargin">
-      <number>0</number>
-     </property>
-     <property name="topMargin">
-      <number>0</number>
-     </property>
-     <property name="rightMargin">
-      <number>0</number>
-     </property>
-     <property name="bottomMargin">
-      <number>0</number>
-     </property>
-     <property name="spacing">
-      <number>6</number>
-     </property>
+  <property name="geometry"><rect><x>0</x><y>0</y><width>860</width><height>460</height></rect></property>
+  <property name="density" stdset="0"><string notr="true">compact</string></property>
+  <layout class="QVBoxLayout" name="planning_page_layout" stretch="1,0">
+   <property name="spacing"><number>8</number></property>
+   <property name="leftMargin"><number>0</number></property>
+   <property name="topMargin"><number>0</number></property>
+   <property name="rightMargin"><number>0</number></property>
+   <property name="bottomMargin"><number>0</number></property>
+   <item>
+    <layout class="QHBoxLayout" name="planning_workspace_layout" stretch="1,0">
+     <property name="spacing"><number>10</number></property>
      <item>
-      <widget class="QLabel" name="planning_Label_1">
-       <property name="sizePolicy">
-        <sizepolicy hsizetype="Preferred" vsizetype="Preferred">
-         <horstretch>0</horstretch>
-         <verstretch>0</verstretch>
-        </sizepolicy>
-       </property>
-       <property name="text">
-        <string>模式</string>
-       </property>
-       <property name="wordWrap">
-        <bool>false</bool>
-       </property>
-       <property name="alignment">
-        <set>Qt::AlignLeft|Qt::AlignVCenter</set>
-       </property>
-       <property name="textInteractionFlags">
-        <set>Qt::LinksAccessibleByMouse</set>
-       </property>
+      <widget class="QWidget" name="planning_editor_panel" native="true">
+       <layout class="QVBoxLayout" name="planning_editor_layout" stretch="0,0,1">
+        <property name="spacing"><number>4</number></property>
+        <property name="leftMargin"><number>0</number></property>
+        <property name="topMargin"><number>0</number></property>
+        <property name="rightMargin"><number>0</number></property>
+        <property name="bottomMargin"><number>0</number></property>
+        <item>
+         <widget class="QLabel" name="planning_result_state">
+          <property name="text"><string>等待生成规划</string></property>
+          <property name="wordWrap"><bool>true</bool></property>
+          <property name="role" stdset="0"><string notr="true">sectionTitle</string></property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QLabel" name="planning_result_summary">
+          <property name="text"><string>编辑目标后生成规划，可查看实际帧数、时长与端点。</string></property>
+          <property name="wordWrap"><bool>true</bool></property>
+          <property name="role" stdset="0"><string notr="true">mutedText</string></property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QTabWidget" name="planning_editor_tabs">
+          <property name="currentIndex"><number>0</number></property>
+          <widget class="QWidget" name="planning_targets_tab">
+           <attribute name="title"><string>目标与路点</string></attribute>
+           <layout class="QVBoxLayout" name="planning_targets_tab_layout">
+            <property name="leftMargin"><number>0</number></property>
+            <property name="topMargin"><number>0</number></property>
+            <property name="rightMargin"><number>0</number></property>
+            <property name="bottomMargin"><number>0</number></property>
+            <item>
+             <widget class="QScrollArea" name="planning_editor_scroll">
+              <property name="frameShape"><enum>QFrame::NoFrame</enum></property>
+              <property name="horizontalScrollBarPolicy"><enum>Qt::ScrollBarAlwaysOff</enum></property>
+              <property name="widgetResizable"><bool>true</bool></property>
+              <widget class="QWidget" name="planning_editor_content">
+               <layout class="QVBoxLayout" name="planning_target_content_layout" stretch="0,1">
+                <property name="spacing"><number>6</number></property>
+                <property name="leftMargin"><number>8</number></property>
+                <property name="topMargin"><number>8</number></property>
+                <property name="rightMargin"><number>8</number></property>
+                <property name="bottomMargin"><number>8</number></property>
+                <item>
+                 <widget class="QGroupBox" name="planning_target_group">
+                  <property name="title"><string>目标关节</string></property>
+                  <property name="sizePolicy"><sizepolicy hsizetype="Preferred" vsizetype="Fixed"><horstretch>0</horstretch><verstretch>0</verstretch></sizepolicy></property>
+                  <layout class="QGridLayout" name="planning_target_grid" columnstretch="0,1,0,1,0,1">
+                   <property name="leftMargin"><number>6</number></property>
+                   <property name="topMargin"><number>4</number></property>
+                   <property name="rightMargin"><number>6</number></property>
+                   <property name="bottomMargin"><number>4</number></property>
+                   <property name="horizontalSpacing"><number>8</number></property>
+                   <property name="verticalSpacing"><number>4</number></property>
+                   <item row="0" column="0"><widget class="QLabel" name="planning_target_labels_0"><property name="text"><string>J1 °</string></property></widget></item>
+                   <item row="0" column="1">
+                    <widget class="QDoubleSpinBox" name="planning_target_spins_0">
+                     <property name="sizePolicy"><sizepolicy hsizetype="Ignored" vsizetype="Fixed"><horstretch>0</horstretch><verstretch>0</verstretch></sizepolicy></property>
+                     <property name="minimumSize"><size><width>80</width><height>0</height></size></property>
+                     <property name="decimals"><number>3</number></property>
+                     <property name="minimum"><double>-100000.000000000000000</double></property>
+                     <property name="maximum"><double>100000.000000000000000</double></property>
+                    </widget>
+                   </item>
+                   <item row="0" column="2"><widget class="QLabel" name="planning_target_labels_1"><property name="text"><string>J2 °</string></property></widget></item>
+                   <item row="0" column="3">
+                    <widget class="QDoubleSpinBox" name="planning_target_spins_1">
+                     <property name="sizePolicy"><sizepolicy hsizetype="Ignored" vsizetype="Fixed"><horstretch>0</horstretch><verstretch>0</verstretch></sizepolicy></property>
+                     <property name="minimumSize"><size><width>80</width><height>0</height></size></property>
+                     <property name="decimals"><number>3</number></property>
+                     <property name="minimum"><double>-100000.000000000000000</double></property>
+                     <property name="maximum"><double>100000.000000000000000</double></property>
+                    </widget>
+                   </item>
+                   <item row="0" column="4"><widget class="QLabel" name="planning_target_labels_2"><property name="text"><string>J3 °</string></property></widget></item>
+                   <item row="0" column="5">
+                    <widget class="QDoubleSpinBox" name="planning_target_spins_2">
+                     <property name="sizePolicy"><sizepolicy hsizetype="Ignored" vsizetype="Fixed"><horstretch>0</horstretch><verstretch>0</verstretch></sizepolicy></property>
+                     <property name="minimumSize"><size><width>80</width><height>0</height></size></property>
+                     <property name="decimals"><number>3</number></property>
+                     <property name="minimum"><double>-100000.000000000000000</double></property>
+                     <property name="maximum"><double>100000.000000000000000</double></property>
+                    </widget>
+                   </item>
+                   <item row="1" column="0"><widget class="QLabel" name="planning_target_labels_3"><property name="text"><string>J4 °</string></property></widget></item>
+                   <item row="1" column="1">
+                    <widget class="QDoubleSpinBox" name="planning_target_spins_3">
+                     <property name="sizePolicy"><sizepolicy hsizetype="Ignored" vsizetype="Fixed"><horstretch>0</horstretch><verstretch>0</verstretch></sizepolicy></property>
+                     <property name="minimumSize"><size><width>80</width><height>0</height></size></property>
+                     <property name="decimals"><number>3</number></property>
+                     <property name="minimum"><double>-100000.000000000000000</double></property>
+                     <property name="maximum"><double>100000.000000000000000</double></property>
+                    </widget>
+                   </item>
+                   <item row="1" column="2"><widget class="QLabel" name="planning_target_labels_4"><property name="text"><string>J5 °</string></property></widget></item>
+                   <item row="1" column="3">
+                    <widget class="QDoubleSpinBox" name="planning_target_spins_4">
+                     <property name="sizePolicy"><sizepolicy hsizetype="Ignored" vsizetype="Fixed"><horstretch>0</horstretch><verstretch>0</verstretch></sizepolicy></property>
+                     <property name="minimumSize"><size><width>80</width><height>0</height></size></property>
+                     <property name="decimals"><number>3</number></property>
+                     <property name="minimum"><double>-100000.000000000000000</double></property>
+                     <property name="maximum"><double>100000.000000000000000</double></property>
+                    </widget>
+                   </item>
+                   <item row="1" column="4"><widget class="QLabel" name="planning_target_labels_5"><property name="text"><string>J6 °</string></property></widget></item>
+                   <item row="1" column="5">
+                    <widget class="QDoubleSpinBox" name="planning_target_spins_5">
+                     <property name="sizePolicy"><sizepolicy hsizetype="Ignored" vsizetype="Fixed"><horstretch>0</horstretch><verstretch>0</verstretch></sizepolicy></property>
+                     <property name="minimumSize"><size><width>80</width><height>0</height></size></property>
+                     <property name="decimals"><number>3</number></property>
+                     <property name="minimum"><double>-100000.000000000000000</double></property>
+                     <property name="maximum"><double>100000.000000000000000</double></property>
+                    </widget>
+                   </item>
+                  </layout>
+                 </widget>
+                </item>
+                <item>
+                 <widget class="QWidget" name="planning_waypoint_panel" native="true">
+                  <layout class="QVBoxLayout" name="planning_waypoint_layout" stretch="0,0,1">
+                   <property name="spacing"><number>4</number></property>
+                   <property name="leftMargin"><number>0</number></property>
+                   <property name="topMargin"><number>0</number></property>
+                   <property name="rightMargin"><number>0</number></property>
+                   <property name="bottomMargin"><number>0</number></property>
+                   <item>
+                    <widget class="QLabel" name="planning_waypoint_heading">
+                     <property name="text"><string>路点列表 · 按行编辑 TCP 与运动方式</string></property>
+                     <property name="wordWrap"><bool>false</bool></property>
+                     <property name="role" stdset="0"><string notr="true">previewTitle</string></property>
+                    </widget>
+                   </item>
+                   <item>
+                    <layout class="QHBoxLayout" name="planning_waypoint_tools" stretch="1,0,0,0">
+                     <property name="spacing"><number>4</number></property>
+                     <item><widget class="QPushButton" name="planning_add_button"><property name="text"><string>添加目标为路点</string></property></widget></item>
+                     <item><widget class="QPushButton" name="planning_delete_button"><property name="text"><string>删除</string></property></widget></item>
+                     <item><widget class="QPushButton" name="planning_up_button"><property name="text"><string>上移</string></property></widget></item>
+                     <item><widget class="QPushButton" name="planning_down_button"><property name="text"><string>下移</string></property></widget></item>
+                    </layout>
+                   </item>
+                   <item>
+                    <widget class="QTableWidget" name="planning_table">
+                     <property name="minimumSize"><size><width>0</width><height>110</height></size></property>
+                     <property name="toolTip"><string>位置单位 mm，姿态单位 °；运动方式填写 ptp 或 linear，速度为 %，停留为 s。可横向滚动查看全部列。</string></property>
+                     <property name="alternatingRowColors"><bool>true</bool></property>
+                     <property name="selectionBehavior"><enum>QAbstractItemView::SelectRows</enum></property>
+                     <property name="selectionMode"><enum>QAbstractItemView::SingleSelection</enum></property>
+                     <property name="editTriggers"><set>QAbstractItemView::DoubleClicked|QAbstractItemView::EditKeyPressed|QAbstractItemView::AnyKeyPressed</set></property>
+                     <property name="rowCount"><number>0</number></property>
+                     <property name="columnCount"><number>9</number></property>
+                     <attribute name="horizontalHeaderMinimumSectionSize"><number>64</number></attribute>
+                     <attribute name="horizontalHeaderDefaultSectionSize"><number>78</number></attribute>
+                     <attribute name="verticalHeaderDefaultSectionSize"><number>28</number></attribute>
+                     <column><property name="text"><string>X mm</string></property></column>
+                     <column><property name="text"><string>Y mm</string></property></column>
+                     <column><property name="text"><string>Z mm</string></property></column>
+                     <column><property name="text"><string>Rx °</string></property></column>
+                     <column><property name="text"><string>Ry °</string></property></column>
+                     <column><property name="text"><string>Rz °</string></property></column>
+                     <column><property name="text"><string>运动方式</string></property></column>
+                     <column><property name="text"><string>速度 %</string></property></column>
+                     <column><property name="text"><string>停留 s</string></property></column>
+                    </widget>
+                   </item>
+                  </layout>
+                 </widget>
+                </item>
+               </layout>
+              </widget>
+             </widget>
+            </item>
+           </layout>
+          </widget>
+          <widget class="QWidget" name="planning_result_tab">
+           <attribute name="title"><string>规划结果</string></attribute>
+           <layout class="QVBoxLayout" name="planning_result_layout">
+            <property name="spacing"><number>6</number></property>
+            <property name="leftMargin"><number>8</number></property>
+            <property name="topMargin"><number>8</number></property>
+            <property name="rightMargin"><number>8</number></property>
+            <property name="bottomMargin"><number>8</number></property>
+            <item>
+             <widget class="QLabel" name="planning_result_caption">
+              <property name="text"><string>规划详情 · 端点、速度、加速度与实际错误信息</string></property>
+              <property name="wordWrap"><bool>true</bool></property>
+              <property name="role" stdset="0"><string notr="true">previewTitle</string></property>
+             </widget>
+            </item>
+            <item>
+             <widget class="QPlainTextEdit" name="planning_preview_text">
+              <property name="readOnly"><bool>true</bool></property>
+              <property name="placeholderText"><string>生成规划后，在此查看实际结果。</string></property>
+             </widget>
+            </item>
+           </layout>
+          </widget>
+         </widget>
+        </item>
+       </layout>
       </widget>
      </item>
      <item>
-      <widget class="QComboBox" name="planning_mode_combo">
-       <property name="sizePolicy">
-        <sizepolicy hsizetype="Preferred" vsizetype="Fixed">
-         <horstretch>0</horstretch>
-         <verstretch>0</verstretch>
-        </sizepolicy>
-       </property>
-       <property name="editable">
-        <bool>false</bool>
-       </property>
-       <property name="currentIndex">
-        <number>0</number>
-       </property>
-       <item>
-        <property name="text">
-         <string>Joint PTP</string>
-        </property>
-       </item>
-       <item>
-        <property name="text">
-         <string>TCP PTP</string>
-        </property>
-       </item>
-       <item>
-        <property name="text">
-         <string>TCP Linear</string>
-        </property>
-       </item>
-       <item>
-        <property name="text">
-         <string>Waypoints</string>
-        </property>
-       </item>
-      </widget>
-     </item>
-     <item>
-      <widget class="QLabel" name="planning_Label_2">
-       <property name="sizePolicy">
-        <sizepolicy hsizetype="Preferred" vsizetype="Preferred">
-         <horstretch>0</horstretch>
-         <verstretch>0</verstretch>
-        </sizepolicy>
-       </property>
-       <property name="text">
-        <string>名称</string>
-       </property>
-       <property name="wordWrap">
-        <bool>false</bool>
-       </property>
-       <property name="alignment">
-        <set>Qt::AlignLeft|Qt::AlignVCenter</set>
-       </property>
-       <property name="textInteractionFlags">
-        <set>Qt::LinksAccessibleByMouse</set>
-       </property>
-      </widget>
-     </item>
-     <item>
-      <widget class="QLineEdit" name="planning_name_edit">
-       <property name="sizePolicy">
-        <sizepolicy hsizetype="Expanding" vsizetype="Fixed">
-         <horstretch>0</horstretch>
-         <verstretch>0</verstretch>
-        </sizepolicy>
-       </property>
-       <property name="text">
-        <string>Planned motion</string>
-       </property>
-       <property name="placeholderText">
-        <string />
-       </property>
-      </widget>
-     </item>
-     <item>
-      <widget class="QLabel" name="planning_Label_3">
-       <property name="sizePolicy">
-        <sizepolicy hsizetype="Preferred" vsizetype="Preferred">
-         <horstretch>0</horstretch>
-         <verstretch>0</verstretch>
-        </sizepolicy>
-       </property>
-       <property name="text">
-        <string>速度</string>
-       </property>
-       <property name="wordWrap">
-        <bool>false</bool>
-       </property>
-       <property name="alignment">
-        <set>Qt::AlignLeft|Qt::AlignVCenter</set>
-       </property>
-       <property name="textInteractionFlags">
-        <set>Qt::LinksAccessibleByMouse</set>
-       </property>
-      </widget>
-     </item>
-     <item>
-      <widget class="QDoubleSpinBox" name="planning_speed_spin">
-       <property name="sizePolicy">
-        <sizepolicy hsizetype="Minimum" vsizetype="Fixed">
-         <horstretch>0</horstretch>
-         <verstretch>0</verstretch>
-        </sizepolicy>
-       </property>
-       <property name="decimals">
-        <number>2</number>
-       </property>
-       <property name="minimum">
-        <double>1.0</double>
-       </property>
-       <property name="maximum">
-        <double>100.0</double>
-       </property>
-       <property name="singleStep">
-        <double>1.0</double>
-       </property>
-       <property name="value">
-        <double>30.0</double>
-       </property>
-       <property name="suffix">
-        <string> %</string>
-       </property>
-      </widget>
-     </item>
-    </layout>
-   </item>
-   <item row="6" column="0" rowspan="1" colspan="2">
-    <widget class="QLineEdit" name="planning_offline_start">
-     <property name="toolTip">
-      <string>离线规划起点 J1–J6，逗号分隔，单位 °；连接后需重新规划。</string>
-     </property>
-     <property name="sizePolicy">
-      <sizepolicy hsizetype="Expanding" vsizetype="Fixed">
-       <horstretch>0</horstretch>
-       <verstretch>0</verstretch>
-      </sizepolicy>
-     </property>
-     <property name="text">
-      <string>0, 0, 0, 0, 0, 0</string>
-     </property>
-     <property name="placeholderText">
-      <string />
-     </property>
-    </widget>
-   </item>
-   <item row="1" column="0" rowspan="1" colspan="2">
-    <layout class="QHBoxLayout" name="planning_HBoxLayout_2" stretch="0,0,0,0,0,0,0,0,0,0,0,0">
-     <property name="leftMargin">
-      <number>0</number>
-     </property>
-     <property name="topMargin">
-      <number>0</number>
-     </property>
-     <property name="rightMargin">
-      <number>0</number>
-     </property>
-     <property name="bottomMargin">
-      <number>0</number>
-     </property>
-     <property name="spacing">
-      <number>6</number>
-     </property>
-     <item>
-      <widget class="QLabel" name="planning_target_labels_0">
-       <property name="sizePolicy">
-        <sizepolicy hsizetype="Preferred" vsizetype="Preferred">
-         <horstretch>0</horstretch>
-         <verstretch>0</verstretch>
-        </sizepolicy>
-       </property>
-       <property name="text">
-        <string>J1 °</string>
-       </property>
-       <property name="wordWrap">
-        <bool>false</bool>
-       </property>
-       <property name="alignment">
-        <set>Qt::AlignLeft|Qt::AlignVCenter</set>
-       </property>
-       <property name="textInteractionFlags">
-        <set>Qt::LinksAccessibleByMouse</set>
-       </property>
-      </widget>
-     </item>
-     <item>
-      <widget class="QDoubleSpinBox" name="planning_target_spins_0">
-       <property name="sizePolicy">
-        <sizepolicy hsizetype="Minimum" vsizetype="Fixed">
-         <horstretch>0</horstretch>
-         <verstretch>0</verstretch>
-        </sizepolicy>
-       </property>
-       <property name="decimals">
-        <number>3</number>
-       </property>
-       <property name="minimum">
-        <double>-100000.0</double>
-       </property>
-       <property name="maximum">
-        <double>100000.0</double>
-       </property>
-       <property name="singleStep">
-        <double>1.0</double>
-       </property>
-       <property name="value">
-        <double>0.0</double>
-       </property>
-       <property name="suffix">
-        <string />
-       </property>
-      </widget>
-     </item>
-     <item>
-      <widget class="QLabel" name="planning_target_labels_1">
-       <property name="sizePolicy">
-        <sizepolicy hsizetype="Preferred" vsizetype="Preferred">
-         <horstretch>0</horstretch>
-         <verstretch>0</verstretch>
-        </sizepolicy>
-       </property>
-       <property name="text">
-        <string>J2 °</string>
-       </property>
-       <property name="wordWrap">
-        <bool>false</bool>
-       </property>
-       <property name="alignment">
-        <set>Qt::AlignLeft|Qt::AlignVCenter</set>
-       </property>
-       <property name="textInteractionFlags">
-        <set>Qt::LinksAccessibleByMouse</set>
-       </property>
-      </widget>
-     </item>
-     <item>
-      <widget class="QDoubleSpinBox" name="planning_target_spins_1">
-       <property name="sizePolicy">
-        <sizepolicy hsizetype="Minimum" vsizetype="Fixed">
-         <horstretch>0</horstretch>
-         <verstretch>0</verstretch>
-        </sizepolicy>
-       </property>
-       <property name="decimals">
-        <number>3</number>
-       </property>
-       <property name="minimum">
-        <double>-100000.0</double>
-       </property>
-       <property name="maximum">
-        <double>100000.0</double>
-       </property>
-       <property name="singleStep">
-        <double>1.0</double>
-       </property>
-       <property name="value">
-        <double>0.0</double>
-       </property>
-       <property name="suffix">
-        <string />
-       </property>
-      </widget>
-     </item>
-     <item>
-      <widget class="QLabel" name="planning_target_labels_2">
-       <property name="sizePolicy">
-        <sizepolicy hsizetype="Preferred" vsizetype="Preferred">
-         <horstretch>0</horstretch>
-         <verstretch>0</verstretch>
-        </sizepolicy>
-       </property>
-       <property name="text">
-        <string>J3 °</string>
-       </property>
-       <property name="wordWrap">
-        <bool>false</bool>
-       </property>
-       <property name="alignment">
-        <set>Qt::AlignLeft|Qt::AlignVCenter</set>
-       </property>
-       <property name="textInteractionFlags">
-        <set>Qt::LinksAccessibleByMouse</set>
-       </property>
-      </widget>
-     </item>
-     <item>
-      <widget class="QDoubleSpinBox" name="planning_target_spins_2">
-       <property name="sizePolicy">
-        <sizepolicy hsizetype="Minimum" vsizetype="Fixed">
-         <horstretch>0</horstretch>
-         <verstretch>0</verstretch>
-        </sizepolicy>
-       </property>
-       <property name="decimals">
-        <number>3</number>
-       </property>
-       <property name="minimum">
-        <double>-100000.0</double>
-       </property>
-       <property name="maximum">
-        <double>100000.0</double>
-       </property>
-       <property name="singleStep">
-        <double>1.0</double>
-       </property>
-       <property name="value">
-        <double>0.0</double>
-       </property>
-       <property name="suffix">
-        <string />
-       </property>
-      </widget>
-     </item>
-     <item>
-      <widget class="QLabel" name="planning_target_labels_3">
-       <property name="sizePolicy">
-        <sizepolicy hsizetype="Preferred" vsizetype="Preferred">
-         <horstretch>0</horstretch>
-         <verstretch>0</verstretch>
-        </sizepolicy>
-       </property>
-       <property name="text">
-        <string>J4 °</string>
-       </property>
-       <property name="wordWrap">
-        <bool>false</bool>
-       </property>
-       <property name="alignment">
-        <set>Qt::AlignLeft|Qt::AlignVCenter</set>
-       </property>
-       <property name="textInteractionFlags">
-        <set>Qt::LinksAccessibleByMouse</set>
-       </property>
-      </widget>
-     </item>
-     <item>
-      <widget class="QDoubleSpinBox" name="planning_target_spins_3">
-       <property name="sizePolicy">
-        <sizepolicy hsizetype="Minimum" vsizetype="Fixed">
-         <horstretch>0</horstretch>
-         <verstretch>0</verstretch>
-        </sizepolicy>
-       </property>
-       <property name="decimals">
-        <number>3</number>
-       </property>
-       <property name="minimum">
-        <double>-100000.0</double>
-       </property>
-       <property name="maximum">
-        <double>100000.0</double>
-       </property>
-       <property name="singleStep">
-        <double>1.0</double>
-       </property>
-       <property name="value">
-        <double>0.0</double>
-       </property>
-       <property name="suffix">
-        <string />
-       </property>
-      </widget>
-     </item>
-     <item>
-      <widget class="QLabel" name="planning_target_labels_4">
-       <property name="sizePolicy">
-        <sizepolicy hsizetype="Preferred" vsizetype="Preferred">
-         <horstretch>0</horstretch>
-         <verstretch>0</verstretch>
-        </sizepolicy>
-       </property>
-       <property name="text">
-        <string>J5 °</string>
-       </property>
-       <property name="wordWrap">
-        <bool>false</bool>
-       </property>
-       <property name="alignment">
-        <set>Qt::AlignLeft|Qt::AlignVCenter</set>
-       </property>
-       <property name="textInteractionFlags">
-        <set>Qt::LinksAccessibleByMouse</set>
-       </property>
-      </widget>
-     </item>
-     <item>
-      <widget class="QDoubleSpinBox" name="planning_target_spins_4">
-       <property name="sizePolicy">
-        <sizepolicy hsizetype="Minimum" vsizetype="Fixed">
-         <horstretch>0</horstretch>
-         <verstretch>0</verstretch>
-        </sizepolicy>
-       </property>
-       <property name="decimals">
-        <number>3</number>
-       </property>
-       <property name="minimum">
-        <double>-100000.0</double>
-       </property>
-       <property name="maximum">
-        <double>100000.0</double>
-       </property>
-       <property name="singleStep">
-        <double>1.0</double>
-       </property>
-       <property name="value">
-        <double>0.0</double>
-       </property>
-       <property name="suffix">
-        <string />
-       </property>
-      </widget>
-     </item>
-     <item>
-      <widget class="QLabel" name="planning_target_labels_5">
-       <property name="sizePolicy">
-        <sizepolicy hsizetype="Preferred" vsizetype="Preferred">
-         <horstretch>0</horstretch>
-         <verstretch>0</verstretch>
-        </sizepolicy>
-       </property>
-       <property name="text">
-        <string>J6 °</string>
-       </property>
-       <property name="wordWrap">
-        <bool>false</bool>
-       </property>
-       <property name="alignment">
-        <set>Qt::AlignLeft|Qt::AlignVCenter</set>
-       </property>
-       <property name="textInteractionFlags">
-        <set>Qt::LinksAccessibleByMouse</set>
-       </property>
-      </widget>
-     </item>
-     <item>
-      <widget class="QDoubleSpinBox" name="planning_target_spins_5">
-       <property name="sizePolicy">
-        <sizepolicy hsizetype="Minimum" vsizetype="Fixed">
-         <horstretch>0</horstretch>
-         <verstretch>0</verstretch>
-        </sizepolicy>
-       </property>
-       <property name="decimals">
-        <number>3</number>
-       </property>
-       <property name="minimum">
-        <double>-100000.0</double>
-       </property>
-       <property name="maximum">
-        <double>100000.0</double>
-       </property>
-       <property name="singleStep">
-        <double>1.0</double>
-       </property>
-       <property name="value">
-        <double>0.0</double>
-       </property>
-       <property name="suffix">
-        <string />
-       </property>
+      <widget class="QFrame" name="planning_parameter_panel">
+       <property name="minimumSize"><size><width>210</width><height>0</height></size></property>
+       <property name="maximumSize"><size><width>228</width><height>16777215</height></size></property>
+       <property name="role" stdset="0"><string notr="true">surfacePanel</string></property>
+       <layout class="QVBoxLayout" name="planning_parameter_layout">
+        <property name="leftMargin"><number>0</number></property>
+        <property name="topMargin"><number>0</number></property>
+        <property name="rightMargin"><number>0</number></property>
+        <property name="bottomMargin"><number>0</number></property>
+        <item>
+         <widget class="QScrollArea" name="planning_parameter_scroll">
+          <property name="frameShape"><enum>QFrame::NoFrame</enum></property>
+          <property name="horizontalScrollBarPolicy"><enum>Qt::ScrollBarAlwaysOff</enum></property>
+          <property name="widgetResizable"><bool>true</bool></property>
+          <widget class="QWidget" name="planning_parameter_content">
+           <layout class="QVBoxLayout" name="planning_parameter_content_layout">
+            <property name="spacing"><number>8</number></property>
+            <property name="leftMargin"><number>10</number></property>
+            <property name="topMargin"><number>10</number></property>
+            <property name="rightMargin"><number>10</number></property>
+            <property name="bottomMargin"><number>10</number></property>
+            <item><widget class="QLabel" name="planning_parameter_heading"><property name="text"><string>规划参数</string></property><property name="role" stdset="0"><string notr="true">sectionTitle</string></property></widget></item>
+            <item>
+             <layout class="QFormLayout" name="planning_parameter_form">
+              <property name="horizontalSpacing"><number>6</number></property>
+              <property name="verticalSpacing"><number>8</number></property>
+              <property name="fieldGrowthPolicy"><enum>QFormLayout::AllNonFixedFieldsGrow</enum></property>
+              <item row="0" column="0"><widget class="QLabel" name="planning_mode_label"><property name="text"><string>模式</string></property></widget></item>
+              <item row="0" column="1">
+               <widget class="QComboBox" name="planning_mode_combo">
+                <item><property name="text"><string>Joint PTP</string></property></item>
+                <item><property name="text"><string>TCP PTP</string></property></item>
+                <item><property name="text"><string>TCP Linear</string></property></item>
+                <item><property name="text"><string>Waypoints</string></property></item>
+               </widget>
+              </item>
+              <item row="1" column="0"><widget class="QLabel" name="planning_name_label"><property name="text"><string>名称</string></property></widget></item>
+              <item row="1" column="1"><widget class="QLineEdit" name="planning_name_edit"><property name="text"><string>Planned motion</string></property></widget></item>
+              <item row="2" column="0"><widget class="QLabel" name="planning_speed_label"><property name="text"><string>速度</string></property></widget></item>
+              <item row="2" column="1">
+               <widget class="QDoubleSpinBox" name="planning_speed_spin">
+                <property name="suffix"><string> %</string></property>
+                <property name="decimals"><number>1</number></property>
+                <property name="minimum"><double>1.000000000000000</double></property>
+                <property name="maximum"><double>100.000000000000000</double></property>
+                <property name="value"><double>30.000000000000000</double></property>
+               </widget>
+              </item>
+             </layout>
+            </item>
+            <item>
+             <widget class="QWidget" name="planning_offline_panel" native="true">
+              <layout class="QVBoxLayout" name="planning_offline_layout">
+               <property name="spacing"><number>4</number></property>
+               <property name="leftMargin"><number>0</number></property>
+               <property name="topMargin"><number>0</number></property>
+               <property name="rightMargin"><number>0</number></property>
+               <property name="bottomMargin"><number>0</number></property>
+               <item><widget class="QLabel" name="planning_offline_label"><property name="text"><string>离线起点 · J1–J6 / °</string></property></widget></item>
+               <item><widget class="QLineEdit" name="planning_offline_start"><property name="text"><string>0, 0, 0, 0, 0, 0</string></property><property name="toolTip"><string>六个关节角，逗号分隔，单位 °；连接后需重新规划。</string></property></widget></item>
+              </layout>
+             </widget>
+            </item>
+            <item><widget class="QPushButton" name="planning_read_button"><property name="text"><string>读取当前位置到目标</string></property></widget></item>
+            <item><widget class="QPushButton" name="planning_add_current_button"><property name="text"><string>添加当前位置为路点</string></property></widget></item>
+            <item>
+             <widget class="QLabel" name="planning_target_help">
+              <property name="text"><string>Joint：输入六个关节角，单位 °。</string></property>
+              <property name="wordWrap"><bool>true</bool></property>
+              <property name="role" stdset="0"><string notr="true">mutedText</string></property>
+             </widget>
+            </item>
+            <item>
+             <widget class="QLabel" name="planning_collision_notice">
+              <property name="text"><string>路径碰撞预检：未实现（未验证自碰撞或环境障碍物）。</string></property>
+              <property name="wordWrap"><bool>true</bool></property>
+              <property name="role" stdset="0"><string notr="true">mutedText</string></property>
+             </widget>
+            </item>
+            <item><spacer name="planning_parameter_spacer"><property name="orientation"><enum>Qt::Vertical</enum></property><property name="sizeHint" stdset="0"><size><width>0</width><height>0</height></size></property></spacer></item>
+           </layout>
+          </widget>
+         </widget>
+        </item>
+       </layout>
       </widget>
      </item>
     </layout>
    </item>
-   <item row="2" column="0" rowspan="1" colspan="2">
-    <widget class="QTableWidget" name="planning_table">
-     <property name="visible">
-      <bool>false</bool>
-     </property>
-     <property name="minimumSize">
-      <size>
-       <width>0</width>
-       <height>110</height>
-      </size>
-     </property>
-     <property name="maximumSize">
-      <size>
-       <width>16777215</width>
-       <height>170</height>
-      </size>
-     </property>
-     <property name="sizePolicy">
-      <sizepolicy hsizetype="Expanding" vsizetype="Expanding">
-       <horstretch>0</horstretch>
-       <verstretch>0</verstretch>
-      </sizepolicy>
-     </property>
-     <property name="rowCount">
-      <number>0</number>
-     </property>
-     <property name="columnCount">
-      <number>9</number>
-     </property>
-     <property name="selectionBehavior">
-      <enum>QAbstractItemView::SelectItems</enum>
-     </property>
-     <property name="editTriggers">
-      <set>QAbstractItemView::DoubleClicked|QAbstractItemView::EditKeyPressed|QAbstractItemView::AnyKeyPressed</set>
-     </property>
-     <column>
-      <property name="text">
-       <string>X mm</string>
-      </property>
-     </column>
-     <column>
-      <property name="text">
-       <string>Y mm</string>
-      </property>
-     </column>
-     <column>
-      <property name="text">
-       <string>Z mm</string>
-      </property>
-     </column>
-     <column>
-      <property name="text">
-       <string>Rx °</string>
-      </property>
-     </column>
-     <column>
-      <property name="text">
-       <string>Ry °</string>
-      </property>
-     </column>
-     <column>
-      <property name="text">
-       <string>Rz °</string>
-      </property>
-     </column>
-     <column>
-      <property name="text">
-       <string>Mode</string>
-      </property>
-     </column>
-     <column>
-      <property name="text">
-       <string>速度 %</string>
-      </property>
-     </column>
-     <column>
-      <property name="text">
-       <string>停留 s</string>
-      </property>
-     </column>
-    </widget>
-   </item>
-   <item row="3" column="0" rowspan="1" colspan="2">
-    <layout class="QHBoxLayout" name="planning_HBoxLayout_3" stretch="0,0,0,0,0,0">
-     <property name="leftMargin">
-      <number>0</number>
-     </property>
-     <property name="topMargin">
-      <number>0</number>
-     </property>
-     <property name="rightMargin">
-      <number>0</number>
-     </property>
-     <property name="bottomMargin">
-      <number>0</number>
-     </property>
-     <property name="spacing">
-      <number>6</number>
-     </property>
-     <item>
-      <widget class="QPushButton" name="planning_read_button">
-       <property name="sizePolicy">
-        <sizepolicy hsizetype="Minimum" vsizetype="Fixed">
-         <horstretch>0</horstretch>
-         <verstretch>0</verstretch>
-        </sizepolicy>
-       </property>
-       <property name="text">
-        <string>读取当前位置</string>
-       </property>
-      </widget>
-     </item>
-     <item>
-      <widget class="QPushButton" name="planning_add_current_button">
-       <property name="sizePolicy">
-        <sizepolicy hsizetype="Minimum" vsizetype="Fixed">
-         <horstretch>0</horstretch>
-         <verstretch>0</verstretch>
-        </sizepolicy>
-       </property>
-       <property name="text">
-        <string>添加当前位置</string>
-       </property>
-      </widget>
-     </item>
-     <item>
-      <widget class="QPushButton" name="planning_add_button">
-       <property name="sizePolicy">
-        <sizepolicy hsizetype="Minimum" vsizetype="Fixed">
-         <horstretch>0</horstretch>
-         <verstretch>0</verstretch>
-        </sizepolicy>
-       </property>
-       <property name="text">
-        <string>添加 Waypoint</string>
-       </property>
-      </widget>
-     </item>
-     <item>
-      <widget class="QPushButton" name="planning_delete_button">
-       <property name="sizePolicy">
-        <sizepolicy hsizetype="Minimum" vsizetype="Fixed">
-         <horstretch>0</horstretch>
-         <verstretch>0</verstretch>
-        </sizepolicy>
-       </property>
-       <property name="text">
-        <string>删除</string>
-       </property>
-      </widget>
-     </item>
-     <item>
-      <widget class="QPushButton" name="planning_up_button">
-       <property name="sizePolicy">
-        <sizepolicy hsizetype="Minimum" vsizetype="Fixed">
-         <horstretch>0</horstretch>
-         <verstretch>0</verstretch>
-        </sizepolicy>
-       </property>
-       <property name="text">
-        <string>上移</string>
-       </property>
-      </widget>
-     </item>
-     <item>
-      <widget class="QPushButton" name="planning_down_button">
-       <property name="sizePolicy">
-        <sizepolicy hsizetype="Minimum" vsizetype="Fixed">
-         <horstretch>0</horstretch>
-         <verstretch>0</verstretch>
-        </sizepolicy>
-       </property>
-       <property name="text">
-        <string>下移</string>
-       </property>
-      </widget>
-     </item>
-    </layout>
-   </item>
-   <item row="4" column="0" rowspan="1" colspan="2">
-    <layout class="QHBoxLayout" name="planning_HBoxLayout_4" stretch="0,0,0,0">
-     <property name="leftMargin">
-      <number>0</number>
-     </property>
-     <property name="topMargin">
-      <number>0</number>
-     </property>
-     <property name="rightMargin">
-      <number>0</number>
-     </property>
-     <property name="bottomMargin">
-      <number>0</number>
-     </property>
-     <property name="spacing">
-      <number>6</number>
-     </property>
-     <item>
-      <widget class="QPushButton" name="planning_plan_button">
-       <property name="sizePolicy">
-        <sizepolicy hsizetype="Minimum" vsizetype="Fixed">
-         <horstretch>0</horstretch>
-         <verstretch>0</verstretch>
-        </sizepolicy>
-       </property>
-       <property name="text">
-        <string>规划 / 预览</string>
-       </property>
-      </widget>
-     </item>
-     <item>
-      <widget class="QPushButton" name="planning_execute_button">
-       <property name="enabled">
-        <bool>false</bool>
-       </property>
-       <property name="sizePolicy">
-        <sizepolicy hsizetype="Minimum" vsizetype="Fixed">
-         <horstretch>0</horstretch>
-         <verstretch>0</verstretch>
-        </sizepolicy>
-       </property>
-       <property name="text">
-        <string>执行</string>
-       </property>
-      </widget>
-     </item>
-     <item>
-      <widget class="QPushButton" name="planning_save_button">
-       <property name="enabled">
-        <bool>false</bool>
-       </property>
-       <property name="sizePolicy">
-        <sizepolicy hsizetype="Minimum" vsizetype="Fixed">
-         <horstretch>0</horstretch>
-         <verstretch>0</verstretch>
-        </sizepolicy>
-       </property>
-       <property name="text">
-        <string>保存到轨迹库</string>
-       </property>
-      </widget>
-     </item>
-     <item>
-      <widget class="QLabel" name="planning_status_label">
-       <property name="sizePolicy">
-        <sizepolicy hsizetype="Preferred" vsizetype="Preferred">
-         <horstretch>0</horstretch>
-         <verstretch>0</verstretch>
-        </sizepolicy>
-       </property>
-       <property name="text">
-        <string>IDLE</string>
-       </property>
-       <property name="wordWrap">
-        <bool>false</bool>
-       </property>
-       <property name="alignment">
-        <set>Qt::AlignLeft|Qt::AlignVCenter</set>
-       </property>
-       <property name="textInteractionFlags">
-        <set>Qt::LinksAccessibleByMouse</set>
-       </property>
-      </widget>
-     </item>
-    </layout>
-   </item>
-   <item row="5" column="0" rowspan="1" colspan="2">
-    <widget class="QPlainTextEdit" name="planning_preview_text">
-     <property name="minimumSize">
-      <size>
-       <width>0</width>
-       <height>150</height>
-      </size>
-     </property>
-     <property name="sizePolicy">
-      <sizepolicy hsizetype="Expanding" vsizetype="Expanding">
-       <horstretch>0</horstretch>
-       <verstretch>0</verstretch>
-      </sizepolicy>
-     </property>
-     <property name="readOnly">
-      <bool>true</bool>
-     </property>
-     <property name="placeholderText">
-      <string />
-     </property>
+   <item>
+    <widget class="QFrame" name="planning_action_bar">
+     <layout class="QHBoxLayout" name="planning_action_layout" stretch="1,0,0,0">
+      <property name="spacing"><number>8</number></property>
+      <property name="leftMargin"><number>0</number></property>
+      <property name="topMargin"><number>0</number></property>
+      <property name="rightMargin"><number>0</number></property>
+      <property name="bottomMargin"><number>0</number></property>
+      <item><widget class="QLabel" name="planning_status_label"><property name="text"><string>IDLE</string></property><property name="wordWrap"><bool>true</bool></property><property name="role" stdset="0"><string notr="true">mutedText</string></property></widget></item>
+      <item><widget class="QPushButton" name="planning_plan_button"><property name="minimumSize"><size><width>96</width><height>32</height></size></property><property name="text"><string>生成规划</string></property><property name="role" stdset="0"><string notr="true">primary</string></property></widget></item>
+      <item><widget class="QPushButton" name="planning_execute_button"><property name="enabled"><bool>false</bool></property><property name="minimumSize"><size><width>96</width><height>32</height></size></property><property name="text"><string>执行规划</string></property></widget></item>
+      <item><widget class="QPushButton" name="planning_save_button"><property name="enabled"><bool>false</bool></property><property name="minimumSize"><size><width>108</width><height>32</height></size></property><property name="text"><string>保存为轨迹</string></property></widget></item>
+     </layout>
     </widget>
    </item>
   </layout>
-  <property name="density" stdset="0">
-   <string notr="true">compact</string>
-  </property>
  </widget>
- <resources />
- <connections />
+ <resources/>
+ <connections/>
 </ui>

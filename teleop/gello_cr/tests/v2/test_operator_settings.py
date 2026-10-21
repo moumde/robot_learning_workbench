@@ -268,7 +268,7 @@ def test_header_settings_save_requires_restart_and_emits_no_commands(settings):
     app.processEvents()
 
     try:
-        window.navigation.setCurrentRow(5)
+        window.navigation.setCurrentRow(4)
         app.processEvents()
         editor = window.settings_editor
         assert editor.isEnabled() and not editor.isWindow()
@@ -324,7 +324,7 @@ def test_settings_disabled_when_devices_or_episode_are_active(
         settings_factory=lambda: settings,
     )
     try:
-        window.navigation.setCurrentRow(5)
+        window.navigation.setCurrentRow(4)
         app.processEvents()
         assert window.settings_editor is not None and not window.settings_editor.isEnabled()
         assert requests == []
