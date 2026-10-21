@@ -90,6 +90,47 @@ def test_plan_preview_save_and_execute_use_point_motion_chain(setup):
     assert engine.motion.current_owner is None
 
 
+def test_rejected_plan_emits_reason_without_reporting_valid_preview_as_failure(setup, caplog):
+    engine, service, _, _ = setup
+    plan(service)
+    assert engine.point_motion.snapshot()["status"] == "READY"
+    assert not any(level == "error" for level, _ in list(engine.events.queue))
+    result = engine.point_motion.plan({"kind": "tcp_ptp", "target": [float("nan")] + [0] * 5})
+    expected = "TrajectoryLimitViolation: TCP position requires 3 finite values"
+    assert not result.success
+    snapshot = engine.point_motion.snapshot()
+    assert snapshot["status"] == "PLANNING_FAILED"
+    assert snapshot["error"] == expected
+    assert snapshot["preview"] is None and snapshot["plan_id"] is None
+    message = "精确走点规划失败：" + expected
+    assert ("error", message) in list(engine.events.queue)
+    assert any(record.getMessage() == message for record in caplog.records)
+    assert not engine.robot.servoj_targets
+
+
+@pytest.mark.parametrize("reason", ["feedback unavailable", ""])
+def test_planning_exception_keeps_reason_original_exception_and_traceback(
+    setup, caplog, monkeypatch, reason
+):
+    engine, _, _, _ = setup
+    failure = OSError(reason)
+
+    def fail_feedback():
+        raise failure
+
+    monkeypatch.setattr(engine.trajectory_source, "read_joints", fail_feedback)
+    with pytest.raises(OSError) as raised:
+        engine.point_motion.plan({"kind": "joint", "target": [0] * 6})
+    expected = reason or "OSError"
+    assert raised.value is failure
+    assert engine.point_motion.snapshot()["error"] == expected
+    message = "精确走点规划失败：" + expected
+    assert ("error", message) in list(engine.events.queue)
+    record = next(record for record in caplog.records if record.getMessage() == message)
+    assert record.exc_info[1] is failure
+    assert not engine.robot.servoj_targets
+
+
 def test_execute_rejects_changed_start_and_pending_dataset_before_any_command(setup):
     engine, service, _, state = setup
     plan_id = plan(service)
@@ -186,7 +227,7 @@ def test_estop_during_execution_cannot_be_overwritten_by_completion(setup):
     assert engine.motion.current_owner is None
 
 
-def test_home_requires_explicit_point_stop_and_preserves_home_lease(setup):
+def test_home_preempts_point_and_preserves_home_lease(setup):
     engine, service, _, _ = setup
     engine.store.data["presets"]["HOME"] = {"robot_joints_deg": [0] * 7}
     engine.o6.connected = False
@@ -195,18 +236,6 @@ def test_home_requires_explicit_point_stop_and_preserves_home_lease(setup):
     wait_for(lambda: bool(engine.robot.servoj_targets))
     producer = engine.point_motion.thread
     point_lease = engine.point_motion._lease
-    with pytest.raises(RuntimeError, match="idle"):
-        engine.return_home()
-    assert producer.is_alive() and engine.point_motion.thread is producer
-    assert point_lease.active
-    assert engine.motion.current_owner is MotionSource.POINT_MOVE
-    assert engine.state == "point_move"
-    assert engine.robot.movej_targets == []
-    service.dispatch(Command.STOP_POINT_MOTION)
-    assert not engine.point_motion.running
-    assert not point_lease.active
-    assert engine.state == "idle"
-    assert engine.point_motion.snapshot()["status"] == "STOPPED"
     original_movej = engine.robot.movej
 
     def home_movej(*args):
@@ -216,7 +245,11 @@ def test_home_requires_explicit_point_stop_and_preserves_home_lease(setup):
         original_movej(*args)
 
     engine.robot.movej = home_movej
-    engine.return_home()
+    service.dispatch(Command.RETURN_HOME)
+    assert not producer.is_alive()
+    assert not point_lease.active
+    assert not engine.point_motion.running
+    assert service.state is WorkflowState.ROBOT_ENABLED
     assert engine.state == "idle"
     assert engine.motion.current_owner is None
     assert engine.robot.movej_targets[-1] == [0] * 7

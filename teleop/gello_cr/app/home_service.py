@@ -47,7 +47,7 @@ class HomeService:
         return home
 
     def return_home(self) -> None:
-        """Return an explicitly enabled, idle robot to HOME outside an Episode."""
+        """Preempt ordinary motion and return HOME without changing an Episode."""
         lease = None
         started = False
         completed = threading.Event()
@@ -61,25 +61,9 @@ class HomeService:
         try:
             if robot is None or self.runtime.state == "closed":
                 raise RuntimeError("请先连接机械臂")
-            episode = (
-                self.runtime._recording_snapshot()
-                if self.runtime._recording_snapshot is not None
-                else {}
-            )
-            if (
-                episode.get("episode_active")
-                or episode.get("episode_pending", bool(episode.get("buffered_frames")))
-                or self.runtime.recording
-                or self.runtime._pending_trajectory is not None
-            ):
-                raise RuntimeError("Episode 或轨迹录制未处理；请先保存或丢弃，再回 HOME")
-            motion = self.runtime.motion.status
-            if (
-                self.runtime.state != "idle"
-                or motion.source is not None
-                or self.runtime.o6_action_active
-            ):
-                raise RuntimeError("HOME 需要 idle；请先停止当前运动并排除故障或紧急停止")
+            allowed_states = ("idle", "following", "replay", "point_move", "dagger", "master_free")
+            if self.runtime.state not in allowed_states or self.runtime.o6_action_active:
+                raise RuntimeError("当前故障、HOME 或手部恢复动作不允许回 HOME")
             # Check enable before NRC's stopped-state check: that API requires
             # servo state 3. HOME never powers the robot on implicitly.
             if robot.servo_state() != 3:
@@ -97,18 +81,30 @@ class HomeService:
                 self.runtime.trajectory_source.check_ready(False, True)
             with self.runtime._state_lock:
                 if (
-                    self.runtime._state != "idle"
+                    self.runtime._state not in allowed_states
                     or self.runtime._stop_generation != generation
                     or self.runtime._shutdown_requested.is_set()
                 ):
                     raise RuntimeError("HOME 回位已被停止或当前运动状态改变")
+                # A delayed ordinary startup must remain cancelled even if it
+                # returns only after HOME has already finished.
+                self.runtime._stop_generation += 1
+                generation = self.runtime._stop_generation
+                self.runtime._follow_stop.set()
+                self.runtime._replay_stop.set()
+                self.runtime._hand_action_stop.set()
                 self.runtime._home_stop.clear()
+                self.runtime._home_capture_transition = self.runtime.capture_snapshot.last_action
                 self.runtime._state = "preset"
                 started = True
             lease = self.runtime.motion.acquire(
                 MotionSource.HOME,
+                allow_preempt=True,
                 on_cancel=self.runtime._home_stop.set,
             )
+            self.runtime._join_follow_producer("HOME takeover")
+            self.runtime.point_motion.stop()
+            self.runtime.stop_trajectory_replay()
             if not robot.wait_until_motion_stopped(5.0, stop_event=self.runtime._home_stop):
                 raise RuntimeError("机械臂尚未停止或 HOME 已取消")
             if robot.servo_state() != 3:
@@ -122,16 +118,27 @@ class HomeService:
                 + ("；O6 同步回 HOME" if o6_homing else "；O6 未连接，仅机械臂回位"),
             )
             if o6_homing:
-                self.runtime.o6.set_profile(o6_cfg["speed"], o6_cfg["torque"])
-                if self.runtime._home_stop.is_set() or self.runtime.stop_generation != generation:
-                    raise RuntimeError("HOME 回位已被停止")
-                self.runtime.o6.set_target(o6_target)
+                # These setters enqueue desired values; serialize with STOP so
+                # a delayed HOME enqueue cannot overwrite the safety hold.
+                with self.runtime._state_lock:
+                    lease.check()
+                    if self.runtime._home_stop.is_set() or self.runtime._stop_generation != generation:
+                        raise RuntimeError("HOME 回位已被停止")
+                    self.runtime.o6.set_profile(o6_cfg["speed"], o6_cfg["torque"])
+                    if self.runtime._home_stop.is_set() or self.runtime._stop_generation != generation:
+                        raise RuntimeError("HOME 回位已被停止")
+                    self.runtime.o6.set_target(o6_target)
             lease.move_joint(
                 JointTarget.from_degrees(target),
                 float(cfg["robot_velocity_percent"]),
                 float(cfg["robot_acc_percent"]),
                 float(cfg["robot_dec_percent"]),
             )
+            accepted_target = self.runtime.motion.last_joint_target
+            # move_joint publishes its accepted target before returning. Only
+            # now may capture attribute the robot action to HOME.
+            with self.runtime._state_lock:
+                self.runtime._home_capture_transition = None
             deadline = time.monotonic() + float(cfg["timeout_s"])
             while True:
                 if self.runtime._home_stop.is_set() or self.runtime.stop_generation != generation:
@@ -172,6 +179,7 @@ class HomeService:
                 self.runtime._o6_action_name = ""
                 self.runtime._state = "idle"
                 self.runtime._last_error = ""
+                self.runtime._home_restart_target = accepted_target
             self._event("info", "机械臂与 O6 已回 HOME；保持停止")
         except Exception as exc:
             if (
@@ -198,5 +206,6 @@ class HomeService:
                 with self.runtime._state_lock:
                     if self.runtime._home_thread is threading.current_thread():
                         self.runtime._home_thread = None
+                        self.runtime._home_capture_transition = None
                     self.runtime._home_lock.release()
                     completed.set()

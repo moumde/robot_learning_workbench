@@ -217,7 +217,16 @@ class PlanningPanel(QWidget):
         def numbers(values):
             return "无" if values is None else ", ".join(f"{v:.4g}" for v in values)
 
-        text = "碰撞检查：不可用\n"
+        status = snapshot.get("status", "IDLE")
+        error = str(snapshot.get("error") or "")
+        text = ""
+        if error:
+            label = "规划失败" if status == "PLANNING_FAILED" else "错误"
+            text = f"{label}：{error}\n\n"
+        if preview.get("collision_checking", "unavailable") == "unavailable":
+            text += "说明：路径碰撞预检：未实现（未验证自碰撞或环境障碍物）\n"
+        else:
+            text += "说明：路径碰撞预检：状态未确认（未确认自碰撞或环境障碍物检查）\n"
         if preview:
             text += (
                 f"{metrics.get('frame_count', 0)} 帧 · {metrics.get('duration_s', 0):.3f}s\n"
@@ -233,10 +242,8 @@ class PlanningPanel(QWidget):
         text += "\n".join(snapshot.get("warnings", ()))
         if snapshot.get("saved_path"):
             text += "\n已保存：" + snapshot["saved_path"]
-        text += "\n" + str(snapshot.get("error", ""))
         if self.preview_text.toPlainText() != text:
             self.preview_text.setPlainText(text)
-        status = snapshot.get("status", "IDLE")
         if self._planned_revision != self._revision and preview:
             status += " · 输入已修改，请重新规划"
         self.status_label.setText(status)

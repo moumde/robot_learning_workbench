@@ -949,19 +949,16 @@ class TeleopEngineTests(unittest.TestCase):
         self.assertFalse(self.engine.o6_manual_override)
         self.assertEqual(self.engine.state, "idle")
 
-    def test_home_rejects_running_replay_without_preemption(self):
+    def test_home_preempts_running_replay_and_stays_stopped(self):
         self.engine.save_home()
         self.engine._set_state("replay")
         lease = self.engine.motion.acquire(MotionSource.REPLAY)
-        try:
-            with self.assertRaisesRegex(RuntimeError, "idle"):
-                self.engine.return_home()
-            self.assertTrue(lease.active)
-            self.assertEqual(self.robot.movej_targets, [])
-            self.assertEqual(self.engine.state, "replay")
-        finally:
-            lease.release()
-            self.engine._set_state("idle")
+        self.engine.return_home()
+        self.assertFalse(lease.active)
+        self.assertEqual(len(self.robot.movej_targets), 1)
+        self.assertEqual(self.engine.state, "idle")
+        self.assertIsNone(self.engine.motion.current_owner)
+        self.assertTrue(self.engine._follow_stop.is_set())
 
     def test_home_stop_during_servo_check_prevents_move(self):
         self.engine.save_home()
@@ -1030,16 +1027,17 @@ class TeleopEngineTests(unittest.TestCase):
         self.assertEqual(self.engine.state, "fault")
         self.assertIsNone(self.engine.motion.current_owner)
 
-    def test_home_rejects_active_and_pending_episode(self):
+    def test_home_preserves_active_and_pending_episode(self):
         self.engine.save_home()
         for episode in (
             {"episode_active": True}, {"episode_pending": True, "buffered_frames": 3},
         ):
-            self.engine.set_recording_snapshot(lambda: episode)
-            with self.assertRaisesRegex(RuntimeError, "Episode"):
-                self.engine.return_home()
-            self.assertEqual(self.robot.movej_targets, [])
+            self.engine.set_recording_snapshot(lambda episode=episode: episode)
+            before = dict(episode)
+            self.engine.return_home()
+            self.assertEqual(episode, before)
             self.assertEqual(self.engine.state, "idle")
+        self.assertEqual(len(self.robot.movej_targets), 2)
 
     def test_home_does_not_publish_recording_actions(self):
         self.store.data["dataset"]["recording_mode"] = "joint"
@@ -1212,6 +1210,9 @@ class TeleopEngineTests(unittest.TestCase):
 
     def test_trajectory_record_and_replay_synchronizes_arm_and_hand(self):
         self.store.data["replay"]["max_joint_speed_deg_s"] = 10000.0
+        # Capture deliberately supplied hand feedback while the new coupled
+        # follow session runs; manual hand override keeps M5 from replacing it.
+        self.engine._o6_manual_override = True
         first_hand = (200, 201, 202, 203, 204, 205)
         final_hand = (120, 121, 122, 123, 124, 125)
         sampled_final = threading.Event()

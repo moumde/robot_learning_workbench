@@ -9,6 +9,7 @@ from typing import Any
 from teleop.gello_cr.control.geometry import (
     _wrapped_angle_delta,
 )
+from teleop.gello_cr.motion import MotionSource
 
 
 class CaptureSnapshot:
@@ -16,6 +17,32 @@ class CaptureSnapshot:
 
     def __init__(self, runtime):
         self.runtime = runtime
+        self.last_action: dict[str, Any] | None = None
+
+    def prepare_teleop_restart(self, generation: int) -> None:
+        """Retain the actual HOME command across an explicit TELEOP startup."""
+        target = self.runtime._home_restart_target
+        if target is None or self.runtime.motion.last_joint_target is not target:
+            return
+        if self.runtime.motion.status.source is not None:
+            return
+        joints = tuple(math.degrees(value) for value in target.positions_rad)
+        tcp = None
+        if self.runtime.store.data["dataset"]["recording_mode"] == "tcp":
+            tcp = tuple(self.runtime.robot.forward_kinematics(list(joints) + [target.auxiliary_axis_deg]))
+        with self.runtime._state_lock:
+            if (
+                self.runtime._stop_generation == generation
+                and self.runtime._state == "idle"
+                and self.runtime._home_restart_target is target
+            ):
+                self.runtime._home_capture_transition = {
+                    "target_joints_deg": joints,
+                    "target_tcp": tcp,
+                    "action_timestamp": target.timestamp,
+                    "motion_source": "HOME",
+                    "next_source": MotionSource.TELEOP,
+                }
 
     def dataset_sample(self) -> dict[str, Any]:
         """Read a bounded-age state/action sample (not hardware synchronized).
@@ -49,19 +76,39 @@ class CaptureSnapshot:
             target_tcp = self.runtime._dataset_target_tcp_controller
             target_joints_deg = self.runtime._dataset_target_joints_deg
             action_timestamp = self.runtime._dataset_action_timestamp
-        owner = self.runtime.motion.current_owner
-        motion_error = self.runtime.motion.status.error
+            transition = self.runtime._home_capture_transition
+        status = self.runtime.motion.status
+        owner = status.source
+        motion_error = status.error
+        if transition is not None and transition.get("next_source") is MotionSource.TELEOP:
+            if (owner is MotionSource.TELEOP and status.last_command_at is not None) or owner not in (
+                None, MotionSource.TELEOP
+            ):
+                with self.runtime._state_lock:
+                    if self.runtime._home_capture_transition is transition:
+                        self.runtime._home_capture_transition = None
+                transition = None
         if motion_error:
             raise RuntimeError(f"运动未正常结束，无法继续记录 Episode: {motion_error}")
         holding_last_target = owner is None and state == "idle" and not motion_error
-        command = self.runtime.motion.last_joint_target
-        tcp_command = self.runtime.motion.last_tcp_target
-        if owner is not None or holding_last_target:
+        # HOME retains an explicitly identified, previously captured command
+        # while old producers drain and the first HOME send is still in flight.
+        # No target is attributed to HOME until the coordinator accepts its send.
+        command = self.runtime.motion.last_joint_target if transition is None else None
+        tcp_command = self.runtime.motion.last_tcp_target if transition is None else None
+        if transition is not None:
+            target_joints_deg = transition["target_joints_deg"]
+            target_tcp = transition["target_tcp"]
+            action_timestamp = transition["action_timestamp"]
+            gello_joint_follow = False
+        elif owner is not None or holding_last_target:
             if command is not None:
                 target_joints_deg = tuple(math.degrees(v) for v in command.positions_rad)
                 action_timestamp = command.timestamp
                 if recording_mode == "tcp" and not (
-                    state in ("preset", "recovering") and target_tcp is not None
+                    state in ("preset", "recovering")
+                    and owner is not MotionSource.HOME
+                    and target_tcp is not None
                 ):
                     target_tcp = robot.forward_kinematics(
                         list(target_joints_deg) + [command.auxiliary_axis_deg]
@@ -78,6 +125,9 @@ class CaptureSnapshot:
         quality = {}
         # The shared motion target supports Teleop, Replay, Policy, and point
         # motion. Taught HOME/preset targets also remain valid while moving.
+        if gello_joint_follow and (telemetry is None or not telemetry["sent_count"]):
+            quality["gello_telemetry_missing"] = 1.0
+            gello_joint_follow = False
         home_joint_action = (
             recording_mode == "joint" and not gello_joint_follow and target_joints_deg is not None
         )
@@ -87,9 +137,6 @@ class CaptureSnapshot:
             and not home_joint_action
         ):
             raise RuntimeError("关节记录需要活动控制源的已下发目标")
-        if gello_joint_follow and (telemetry is None or not telemetry["sent_count"]):
-            quality["gello_telemetry_missing"] = 1.0
-            gello_joint_follow = False
         if gello_joint_follow:
             age_limit = float(self.runtime.store.data["dataset"]["action_max_age_s"])
             feedback_age = sample_started_at - telemetry["feedback_at"]
@@ -185,6 +232,15 @@ class CaptureSnapshot:
 
         quality["sample_latency_s"] = now - sample_started_at
         quality["command_age_s"] = now - action_timestamp
+        action_source = transition["motion_source"] if transition is not None else (
+            owner.name if owner is not None else None
+        )
+        self.last_action = {
+            "target_joints_deg": tuple(target_joints_deg) if target_joints_deg is not None else None,
+            "target_tcp": tuple(commanded_tcp) if commanded_tcp is not None else None,
+            "action_timestamp": action_timestamp,
+            "motion_source": action_source,
+        }
         return {
             "timestamp": now,
             "quality": quality,
@@ -203,8 +259,12 @@ class CaptureSnapshot:
             "hand_state": tuple(o6_position),
             "hand_command": tuple(hand_command) if hand_command is not None else None,
             "metadata": {
-                "motion_source": owner.name if owner is not None else None,
+                "motion_source": action_source,
                 "motion_state": state,
+                "home_transition": transition is not None,
+                "action_provenance": (
+                    "previous_accepted_command" if transition is not None else "current"
+                ),
                 "holding_last_accepted_target": bool(
                     holding_last_target and (command is not None or tcp_command is not None)
                 ),

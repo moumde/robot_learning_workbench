@@ -1,8 +1,29 @@
 import json
+import logging
 from types import SimpleNamespace
 
+import pytest
+
 from teleop.gello_cr.cli.replay_trajectory import main
+from teleop.gello_cr.support.logging_config import _LOGGERS
 from teleop.gello_cr.trajectory import TrajectoryFrame, TrajectoryStore, make_trajectory
+
+
+@pytest.fixture(autouse=True)
+def restore_cli_logging():
+    # CLI setup binds console handlers to the current stderr, which capsys
+    # closes after the test. Restore logging before that captured stream exits.
+    loggers = [logging.getLogger(name) for name in _LOGGERS]
+    previous = [(logger, list(logger.handlers), logger.level, logger.propagate) for logger in loggers]
+    original_handlers = {handler for _, handlers, _, _ in previous for handler in handlers}
+    yield
+    created = {handler for logger in loggers for handler in logger.handlers} - original_handlers
+    for logger, handlers, level, propagate in previous:
+        logger.handlers[:] = handlers
+        logger.setLevel(level)
+        logger.propagate = propagate
+    for handler in created:
+        handler.close()
 
 
 def test_cli_previews_saved_trajectory_without_constructing_runtime(tmp_path, capsys):

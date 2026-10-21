@@ -92,6 +92,7 @@ class ApplicationService:
         self._readiness_snapshot = None
         self._active_command = None
         self._last_safety_command = None
+        self._last_safety_generation = None
 
     def set_recording_snapshot(self, provider):
         self._recording_snapshot = provider
@@ -251,6 +252,7 @@ class ApplicationService:
             new_state = self._state_machine.apply(command)
             self._last_safety_command = command
             self._preemption_generation += 1
+            self._last_safety_generation = self._preemption_generation
             self._last_error = ""
             self._emit_locked(
                 kind="state_changed",
@@ -293,6 +295,16 @@ class ApplicationService:
                 value=value,
             )
 
+    def _apply_normal_transition_locked(self, command):
+        if command in (
+            Command.STOP_TRAJECTORY_RECORDING, Command.CANCEL_TRAJECTORY_RECORDING,
+        ) and self._runtime_snapshot is not None:
+            # Resolving a preempted recording must not hide the newer follow
+            # session that its lease-scoped cleanup deliberately leaves running.
+            if (self._runtime_snapshot() or {}).get("state") == "following":
+                return self._state_machine.state
+        return self._state_machine.apply(command, validated=True)
+
     def _dispatch_normal(
         self,
         command: Command,
@@ -309,6 +321,13 @@ class ApplicationService:
             value = handler(data) if handler is not None else None
         except Exception as exc:
             with self._lock:
+                if (
+                    command is Command.STOP_TRAJECTORY_RECORDING
+                    and getattr(exc, "trajectory_recording_stopped", False)
+                    and self._state_machine.state is WorkflowState.TELEOP_RUNNING
+                    and generation == self._preemption_generation
+                ):
+                    self._apply_normal_transition_locked(command)
                 self._last_error = f"{type(exc).__name__}: {exc}"
                 self._emit_locked(
                     kind="command_failed",
@@ -351,7 +370,7 @@ class ApplicationService:
                     superseded_command=command,
                 )
             else:
-                new_state = self._state_machine.apply(command, validated=True)
+                new_state = self._apply_normal_transition_locked(command)
                 self._last_error = ""
                 self._emit_locked(
                     kind="state_changed",
@@ -432,9 +451,10 @@ class ApplicationService:
             command = Command.EMERGENCY_STOP
         elif state is WorkflowState.FAULT:
             command = Command.REPORT_FAULT
-        elif self._last_safety_command is Command.STOP_MOTION and state in (
-            WorkflowState.ROBOT_ENABLED,
-            WorkflowState.CONNECTED,
+        elif (
+            self._last_safety_command is Command.STOP_MOTION
+            and self._last_safety_generation == self._preemption_generation
+            and state in (WorkflowState.ROBOT_ENABLED, WorkflowState.CONNECTED)
         ):
             command = Command.STOP_MOTION
         else:

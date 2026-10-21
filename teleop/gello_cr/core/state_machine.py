@@ -224,7 +224,7 @@ class WorkflowStateMachine:
                 WorkflowState.RETURNING_HOME,
             )
         if command is Command.START_TRAJECTORY_RECORDING:
-            return self.state in _ENABLED or self.state is WorkflowState.CONNECTED
+            return self.state in (WorkflowState.ROBOT_ENABLED, WorkflowState.TELEOP_RUNNING)
         if command in (
             Command.STOP_POINT_MOTION,
             Command.STOP_TRAJECTORY_REPLAY,
@@ -234,10 +234,7 @@ class WorkflowStateMachine:
         if command is Command.STOP_MOTION:
             return self.state is not WorkflowState.OFFLINE
         if command is Command.RETURN_HOME:
-            return (
-                self.state is WorkflowState.ROBOT_ENABLED
-                and self.recording_state is RecordingState.IDLE
-            )
+            return self.state in _ENABLED and self.state is not WorkflowState.RETURNING_HOME
         if command is Command.HOME_COMPLETED:
             return self.state is WorkflowState.RETURNING_HOME
         if command is Command.EMERGENCY_STOP:
@@ -280,6 +277,11 @@ class WorkflowStateMachine:
             self.state = self.recovery_state
         elif command is Command.STOP_MOTION:
             if self.state in _ENABLED:
+                self.state = WorkflowState.ROBOT_ENABLED
+        elif command is Command.START_TRAJECTORY_RECORDING:
+            self.state = WorkflowState.TELEOP_RUNNING
+        elif command in (Command.STOP_TRAJECTORY_RECORDING, Command.CANCEL_TRAJECTORY_RECORDING):
+            if self.state is WorkflowState.TELEOP_RUNNING:
                 self.state = WorkflowState.ROBOT_ENABLED
         elif command is Command.RETURN_HOME:
             self.state = WorkflowState.RETURNING_HOME

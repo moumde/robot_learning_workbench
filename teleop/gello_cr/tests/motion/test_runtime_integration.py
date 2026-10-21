@@ -15,9 +15,9 @@ from teleop.gello_cr.app.runtime_bindings import RuntimeCommandBindings
 from teleop.gello_cr.core.state_machine import Command, WorkflowState, WorkflowStateMachine
 from teleop.gello_cr.motion import MotionSource
 from teleop.gello_cr.motion.policy_adapter import PolicyRuntimeView
+from teleop.gello_cr.tests.fakes.runtime import FakeGello, FakeO6, FakeRoArm, FakeRobot
 from teleop.gello_cr.trajectory import ReplayOptions, TrajectoryFrame, make_trajectory
 from teleop.gello_cr.ui.backend import RuntimeFaultSnapshotBridge
-from teleop.gello_cr.tests.fakes.runtime import FakeGello, FakeO6, FakeRoArm, FakeRobot
 
 
 class HoldingHand(FakeO6):
@@ -115,7 +115,7 @@ def test_replay_rejects_speed_above_configured_limit_before_motion(
     assert not engine.robot.servoj_targets
 
 
-def test_service_stop_replay_does_not_wait_on_its_completion_callback(runtime_factory):
+def test_service_stop_replay_does_not_wait_on_its_completion_callback(runtime_factory, request):
     engine = runtime_factory(FakeRobot())
     value = make_trajectory(
         "stop me",
@@ -128,7 +128,8 @@ def test_service_stop_replay_does_not_wait_on_its_completion_callback(runtime_fa
     service = ApplicationService(
         state_machine=WorkflowStateMachine(state=WorkflowState.ROBOT_ENABLED)
     )
-    RuntimeCommandBindings(service, teleop_engine=engine, recorder=None).install()
+    bindings = RuntimeCommandBindings(service, teleop_engine=engine, recorder=None).install()
+    request.addfinalizer(bindings.close)
     service.dispatch(Command.REPLAY_TRAJECTORY, {"trajectory_id": value.metadata.trajectory_id})
     assert engine.o6.target_sent.wait(1)
 
@@ -140,7 +141,7 @@ def test_service_stop_replay_does_not_wait_on_its_completion_callback(runtime_fa
     assert engine.motion.current_owner is None
 
 
-def test_fast_replay_completion_returns_workflow_to_enabled(runtime_factory):
+def test_fast_replay_completion_returns_workflow_to_enabled(runtime_factory, request):
     engine = runtime_factory(FakeRobot())
     value = make_trajectory(
         "one frame",
@@ -160,7 +161,8 @@ def test_fast_replay_completion_returns_workflow_to_enabled(runtime_factory):
             else None
         )
     )
-    RuntimeCommandBindings(service, teleop_engine=engine, recorder=None).install()
+    bindings = RuntimeCommandBindings(service, teleop_engine=engine, recorder=None).install()
+    request.addfinalizer(bindings.close)
 
     service.dispatch(Command.REPLAY_TRAJECTORY, {"trajectory_id": value.metadata.trajectory_id})
 

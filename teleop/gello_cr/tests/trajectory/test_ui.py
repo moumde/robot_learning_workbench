@@ -35,6 +35,7 @@ def trajectory_window():
         runtime_snapshot=lambda: snapshot,
         recorder_snapshot=lambda: {},
         readiness_snapshot=lambda: {
+            "master_connected": True,
             "o6_connected": True,
             "robot_connected": True,
             "servo_state": "on",

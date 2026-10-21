@@ -81,11 +81,14 @@ class TeleopRuntime:
         self._replay_stop = threading.Event()
         self._shutdown_requested = threading.Event()
         self._follow_thread: threading.Thread | None = None
+        self._follow_lease: MotionLease | None = None
         self.external_control = None
         self._last_dagger_snapshot = {}
         self._home_thread: threading.Thread | None = None
         self._home_completed = threading.Event()
         self._home_completed.set()
+        self._home_capture_transition: dict[str, Any] | None = None
+        self._home_restart_target = None
         self._replay_thread: threading.Thread | None = None
         self._o6_manual_override = False
         self._o6_action_active = False
@@ -783,8 +786,8 @@ class TeleopRuntime:
     def _record_thread(self):
         return self.trajectory_recorder.thread
 
-    def start_trajectory_recording(self, name):
-        return self.trajectory_service.start_trajectory_recording(name)
+    def start_trajectory_recording(self, name, *, on_finished=None):
+        return self.trajectory_service.start_trajectory_recording(name, on_finished=on_finished)
 
     def stop_trajectory_recording(self):
         return self.trajectory_service.stop_trajectory_recording()

@@ -39,7 +39,7 @@ def test_joint_ui_converts_degrees_and_requires_unchanged_preview_to_execute(pan
     assert commands[-1][1]["speed_scale"] == 0.3
     snapshot = {
         "plan_id": "new-plan",
-        "preview": {"start_joint_rad": [0] * 6},
+        "preview": {"start_joint_rad": [0] * 6, "collision_checking": "unavailable"},
         "metrics": {},
         "status": "READY",
     }
@@ -52,7 +52,57 @@ def test_joint_ui_converts_degrees_and_requires_unchanged_preview_to_execute(pan
     assert not widget.save_button.isEnabled()
     widget.render(snapshot, view)
     assert not widget.execute_button.isEnabled()
-    assert "碰撞检查：不可用" in widget.preview_text.toPlainText()
+    assert "路径碰撞预检：未实现（未验证自碰撞或环境障碍物）" in widget.preview_text.toPlainText()
+
+
+@pytest.mark.parametrize(
+    ("capability", "notice"),
+    [
+        ({}, "路径碰撞预检：未实现（未验证自碰撞或环境障碍物）"),
+        (
+            {"collision_checking": "unavailable"},
+            "路径碰撞预检：未实现（未验证自碰撞或环境障碍物）",
+        ),
+        (
+            {"collision_checking": "unrecognized"},
+            "路径碰撞预检：状态未确认（未确认自碰撞或环境障碍物检查）",
+        ),
+    ],
+)
+def test_collision_capability_notice_does_not_report_a_successful_plan_as_failed(
+    panel, capability, notice
+):
+    widget, _, view = panel
+    widget.plan_button.click()
+    widget.render(
+        {
+            "plan_id": "new-plan",
+            "preview": {"start_joint_rad": [0] * 6, **capability},
+            "status": "READY",
+            "error": "",
+        },
+        view,
+    )
+    assert widget.status_label.text() == "READY"
+    assert widget.preview_text.toPlainText().startswith("说明：" + notice)
+    assert "规划失败" not in widget.preview_text.toPlainText()
+    assert widget.execute_button.isEnabled()
+
+
+@pytest.mark.parametrize(
+    ("status", "error", "label"),
+    [
+        ("PLANNING_FAILED", "JointLimitViolation: J1 outside configured limits", "规划失败"),
+        ("FAULT", "Robot must be connected and enabled for replay", "错误"),
+    ],
+)
+def test_motion_error_is_shown_before_the_collision_capability_notice(panel, status, error, label):
+    widget, _, view = panel
+    widget.render({"status": status, "error": error}, view)
+    text = widget.preview_text.toPlainText()
+    assert text.startswith(label + "：" + error + "\n\n说明：路径碰撞预检：未实现")
+    assert widget.status_label.text() == status
+    assert not widget.execute_button.isEnabled()
 
 
 def test_tcp_waypoint_editor_converts_units_and_reorders_without_motion(panel):
