@@ -235,6 +235,41 @@ def test_home_handoff_and_accepted_target_remain_in_one_episode(runtime, tmp_pat
         session.finalize()
 
 
+@pytest.mark.parametrize("command", [Command.RETURN_HOME, Command.HOME_AND_SAVE_EPISODE])
+def test_missing_home_during_teleop_fault_stops_motion_and_keeps_episode(runtime, command):
+    service = ApplicationService(
+        state_machine=WorkflowStateMachine(
+            WorkflowState.ROBOT_ENABLED, recording_state=RecordingState.RECORDING
+        )
+    )
+    bindings = RuntimeCommandBindings(
+        service,
+        teleop_engine=runtime,
+        recorder=SimpleNamespace(snapshot=lambda: {"episode_active": True, "buffered_frames": 5}),
+    ).install()
+    try:
+        service.dispatch(Command.START_TELEOP)
+        runtime.wait_follow_ready()
+        lease, producer = runtime._follow_lease, runtime._follow_thread
+        assert runtime.robot.servoj_targets
+        del runtime.store.data["presets"]["HOME"]
+
+        with pytest.raises(RuntimeError, match="尚未保存"):
+            service.dispatch(command)
+
+        assert service.state is WorkflowState.FAULT
+        assert runtime.state == "fault"
+        assert not lease.active
+        assert runtime.motion.current_owner is None
+        assert runtime.robot.stopped
+        producer.join(1)
+        assert not producer.is_alive()
+        assert not runtime.robot.movej_targets
+        assert service.snapshot().recording_state is RecordingState.RECORDING
+    finally:
+        bindings.close()
+
+
 def test_home_stop_during_o6_profile_never_enqueues_home_hand_target(runtime):
     runtime.o6.set_target([200] * 6)
     original = runtime.o6.set_profile

@@ -225,9 +225,22 @@ class ApplicationService:
             value = handler(data)
         except Exception as exc:
             logging.getLogger("workbench.application").exception("RETURN_HOME failed")
-            if self._preemption_generation != generation:
-                raise CommandSuperseded("HOME 回位被停止或故障中断") from exc
-            self.report_external_fault(f"HOME 回位失败：{exc}")
+            reason = f"HOME 回位失败：{exc}"
+            try:
+                # HOME can fail validation before the runtime has taken over
+                # motion. Observing a fault alone would leave teleop running.
+                self._dispatch_safety(
+                    Command.REPORT_FAULT,
+                    MappingProxyType({"reason": reason}),
+                    expected_generation=generation,
+                )
+            except CommandSuperseded as superseded:
+                raise superseded from exc
+            except Exception as stop_exc:
+                raise ExceptionGroup("HOME 回位及故障停止失败", [exc, stop_exc]) from None
+            with self._lock:
+                if self._preemption_generation == generation + 1:
+                    self.report_external_fault(reason)
             raise
         with self._lock:
             if (
@@ -343,8 +356,15 @@ class ApplicationService:
         self,
         command: Command,
         data: Mapping[str, Any],
+        *,
+        expected_generation: int | None = None,
     ) -> CommandResult:
         with self._lock:
+            if (
+                expected_generation is not None
+                and self._preemption_generation != expected_generation
+            ):
+                raise CommandSuperseded("HOME 回位被停止或故障中断")
             previous_state = self._state_machine.state
             self._validate_locked(command, data)
             handler = self._handlers.get(command)
