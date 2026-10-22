@@ -517,11 +517,23 @@ class MainWindow(QMainWindow):
         control_row.addWidget(self.stop_task_button)
         root_layout.addLayout(control_row)
 
+        log_header = QHBoxLayout()
+        log_header.addWidget(QLabel("运行日志"))
+        log_header.addStretch(1)
+        clear_log_button = QPushButton("清理日志")
+        clear_log_button.clicked.connect(self._clear_log)
+        log_header.addWidget(clear_log_button)
+        root_layout.addLayout(log_header)
+
         self.log = QTextEdit()
         self.log.setReadOnly(True)
         self.log.setPlaceholderText("模型服务与执行日志")
         self.log.setMaximumHeight(170)
         root_layout.addWidget(self.log)
+
+    def _clear_log(self) -> None:
+        """Clear the on-screen log without affecting running processes or log files."""
+        self.log.clear()
 
     def _log(self, message: str) -> None:
         self.log.append(message)
