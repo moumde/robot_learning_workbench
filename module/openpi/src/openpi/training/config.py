@@ -991,8 +991,8 @@ _CONFIGS = [
         ),
         data=LeRobotCR3O6DataConfig(
             # run_openpi.sh defaults HF_LEROBOT_HOME to the workspace dataset/train folder.
-            repo_id="data_v21",
-            assets=AssetsConfig(asset_id="local/data_v21"),
+            repo_id="cr5_o6_20261020_152211_949447518_v21_224",
+            assets=AssetsConfig(asset_id="local/cr5_o6_20261020_152211_949447518_v21_224"),
             base_config=DataConfig(
                 prompt_from_task=True,
                 action_sequence_keys=("action",),
@@ -1022,6 +1022,48 @@ _CONFIGS = [
         optimizer=_optimizer.AdamW(clip_gradient_norm=1.0),
         save_interval=10_000,
         num_train_steps=100_000,
+    ),
+    #
+    # Dobot CR3 + LinkerHand O6 Pi05 full fine-tuning config.
+    #
+    TrainConfig(
+        name="pi05_cr3_o6",
+        model=pi0_config.Pi0Config(
+            pi05=True,
+            paligemma_variant="gemma_2b",
+            action_expert_variant="gemma_300m",
+            action_dim=32,
+            action_horizon=30,
+            discrete_state_input=False,
+        ),
+        data=LeRobotCR3O6DataConfig(
+            # run_openpi.sh defaults HF_LEROBOT_HOME to the workspace dataset/train folder.
+            repo_id="cr5_o6_20261020_152211_949447518_v21",
+            assets=AssetsConfig(asset_id="local/cr5_o6_20261020_152211_949447518_v21"),
+            base_config=DataConfig(
+                prompt_from_task=True,
+                action_sequence_keys=("action",),
+            ),
+        ),
+        assets_base_dir=str(_WORKSPACE_ROOT / "assets"),
+        checkpoint_base_dir=str(_WORKSPACE_ROOT / "checkpoints"),
+        weight_loader=weight_loaders.CheckpointWeightLoader(
+            "gs://openpi-assets/checkpoints/pi05_base/params"
+        ),
+        # No freeze_filter: all model parameters are trainable (full fine-tuning).
+        batch_size=16,
+        lr_schedule=_optimizer.CosineDecaySchedule(
+            warmup_steps=1_000,
+            peak_lr=1e-5,
+            decay_steps=20_000,
+            decay_lr=1e-6,
+        ),
+        optimizer=_optimizer.AdamW(clip_gradient_norm=1.0),
+        log_interval=50,
+        save_interval=1_000,
+        keep_period=5_000,
+        num_train_steps=30_000,
+        wandb_enabled=False,
     ),
     #
     # Debugging configs.
