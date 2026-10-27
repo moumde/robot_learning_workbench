@@ -23,6 +23,7 @@ from teleop.gello_cr.bootstrap import build_operator_application
 from teleop.gello_cr.core.state_machine import WorkflowState
 from teleop.gello_cr.support.logging_config import configure_logging
 from teleop.gello_cr.support.paths import workbench_root
+from teleop.gello_cr.ui.dependencies import ensure_dynamixel_sdk
 
 
 def _default_repo_root() -> Path:
@@ -103,6 +104,16 @@ def main(
                 "hardware_connections=not_started"
             )
             return 0
+
+        if str(operator.runtime.store.data["master"]["type"]).lower() == "gello":
+            try:
+                ensure_dynamixel_sdk()
+            except Exception:
+                try:
+                    operator.close()
+                except Exception:
+                    logger.exception("Workbench shutdown after dependency check failed")
+                raise
 
         try:
             from PySide6.QtWidgets import QApplication

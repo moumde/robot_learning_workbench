@@ -51,6 +51,9 @@ GELLO 采样接口保留成功总线读数的 monotonic 时间戳，重复读取
 父项目 `.[ui,hdf5,data-validation]`、Dynamixel SDK、RealSense、PyAV 数据校验和 O6 Modbus 依赖。
 指定 `GELLO_CR_PYTHON` 或 `NRC_PYTHON` 时须先创建该 Python 3.12 环境。
 脚本不安装 `vendor/gello/requirements.txt`，也不向界面进程安装 LeRobot 或训练栈。
+正常启动界面且主设备类型为 GELLO 时，会先检查当前解释器的 Dynamixel SDK；缺少时
+自动安装并重新检查。安装需要可用的包源和 `uv` 或该解释器的 `pip`，失败时停止启动并提示处理方法。
+`--check-only` 只检查配置，不安装或验证该 SDK。
 
 Writer 是独立子进程。默认格式是 `lerobot_v21`，由
 `module/gello_writers/v21/.venv/bin/python` 中的官方 `lerobot==0.3.3` 写出 V2.1。
