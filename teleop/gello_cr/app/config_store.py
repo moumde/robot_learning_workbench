@@ -320,6 +320,18 @@ class TeleopConfigStore:
         }
         if override := os.environ.get("GELLO_CR_DATA_PYTHON"):
             data["dataset"]["worker_python"] = self._resolve_worker_python(override)
+            # The per-format mapping is what the writer actually consumes.
+            # Keep the other formats separate when overriding this selection.
+            data["dataset"]["worker_pythons"][data["dataset"]["format"]] = (
+                self._resolve_worker_python(override)
+            )
+        for format_name, variable in (
+            ("lerobot_v21", "GELLO_CR_V21_PYTHON"),
+            ("lerobot_v3", "GELLO_CR_V3_PYTHON"),
+            ("hdf5", "GELLO_CR_HDF5_PYTHON"),
+        ):
+            if override := os.environ.get(variable):
+                data["dataset"]["worker_pythons"][format_name] = self._resolve_worker_python(override)
         return data
 
     def _validate(self, data: dict[str, Any]) -> None:

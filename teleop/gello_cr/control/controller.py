@@ -565,7 +565,7 @@ class TeleopController:
                             "sent_count": sent_count,
                             "send_hz": (
                                 (sent_count - 1) / (last_sent_at - first_sent_at)
-                                if sent_count > 1
+                                if sent_count > 1 and last_sent_at > first_sent_at
                                 else 0.0
                             ),
                             "tracking_error_deg": float(np.max(np.abs(last_target - actual))),

@@ -62,6 +62,7 @@ def main(
 
     configure_logging(repo_root=repo_root)
     logger = logging.getLogger("workbench.startup")
+    logger.info("Teleop Python: %s", sys.executable)
     operator = None
     try:
         if unknown:

@@ -28,13 +28,15 @@ class WriterFactory:
         python = self.worker_pythons.get(self.format_name, self.config.worker_python)
         return create_writer(replace(self.config, worker_python=python))
 
-    def prepare_environment(self, *, event_callback=None, allow_install=True):
+    def prepare_environment(self, *, event_callback=None, allow_install=True, format_name=None):
         from .environment import prepare_writer_environment
 
-        python = self.worker_pythons.get(self.format_name, self.config.worker_python)
-        prepare_writer_environment(
-            self.format_name, python, event_callback=event_callback, allow_install=allow_install
+        format_name = format_name or self.format_name
+        python = self.worker_pythons.get(format_name, self.config.worker_python)
+        selected = prepare_writer_environment(
+            format_name, python, event_callback=event_callback, allow_install=allow_install
         )
+        self.worker_pythons[format_name] = selected
 
 
 def create_writer(format_name: str | DatasetWriterConfig, **options) -> DatasetWriter:

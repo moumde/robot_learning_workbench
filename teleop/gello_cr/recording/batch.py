@@ -99,7 +99,7 @@ class BatchManager:
         return self.staging_root / batch_id
 
     def _factory_for(self, batch):
-        return WriterFactory(
+        factory = WriterFactory(
             replace(
                 self.writer_factory.config,
                 format=DatasetFormat(batch.dataset_format),
@@ -107,6 +107,11 @@ class BatchManager:
             ),
             worker_pythons=self.writer_factory.worker_pythons,
         )
+        # Resume, validation and final merge must use the same interpreter
+        # selection as a newly created batch, even after a process restart.
+        factory.prepare_environment(event_callback=self._event, allow_install=False)
+        self.writer_factory.worker_pythons.update(factory.worker_pythons)
+        return factory
 
     def prepare_dataset(self, task, base_root, *, task_description="", allow_environment_setup=False):
         return self.create_dataset(

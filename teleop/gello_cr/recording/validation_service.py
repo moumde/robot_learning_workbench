@@ -6,6 +6,9 @@ from .worker_client import WorkerClient
 
 
 def validate_in_worker(format_name, root, writer_factory):
+    prepare = getattr(writer_factory, "prepare_environment", None)
+    if callable(prepare):
+        prepare(format_name=format_name, allow_install=False)
     python = writer_factory.worker_pythons.get(format_name, writer_factory.config.worker_python)
     client = WorkerClient(python, Path(__file__).with_name("worker.py"))
     try:

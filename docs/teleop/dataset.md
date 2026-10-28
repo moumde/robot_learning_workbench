@@ -51,7 +51,7 @@ O6 六维顺序是拇指弯曲、拇指侧摆、食指、中指、无名指、�
 }
 ```
 
-这些路径相对 `config/teleop/gello_cr.json`，环境由父项目安装脚本创建；V3 需显式选择已验证源码，详见 [集成说明](../gello_cr_integration.md)。先选 `worker_pythons[format]`，缺少对应项才回退到 `worker_python`；`GELLO_CR_DATA_PYTHON` 覆盖的是该回退值。Worker 启动、编码、合并或校验失败必须保留为错误，不能标记数据发布成功。
+这些路径相对 `config/teleop/gello_cr.json`，详见 [集成说明](../gello_cr_integration.md)。`GELLO_CR_DATA_PYTHON` 覆盖启动时所选格式的实际 Worker 映射；分格式 `GELLO_CR_V21_PYTHON`、`GELLO_CR_V3_PYTHON`、`GELLO_CR_HDF5_PYTHON` 优先级更高。保留默认路径时，会先检查选定或激活 Conda 中对应格式的 SDK，兼容则复用，否则使用项目独立环境。V3 的独立安装仍需指定已验证源码。Worker 启动、编码、合并或校验失败必须保留为错误，不能标记数据发布成功。
 
 ## Batch / Segment / 发布
 

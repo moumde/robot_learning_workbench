@@ -8,7 +8,8 @@ Usage: scripts/setup_teleop_env.sh
 
 Reuse the parent's NRC Python 3.12 environment and install GELLO UI, serial,
 RealSense and HDF5 dependencies. Create the default NRC environment if missing.
-Select an existing interpreter with GELLO_CR_PYTHON or NRC_PYTHON (in that order).
+Select an existing interpreter with GELLO_CR_PYTHON, NRC_PYTHON, or NRC_ENV.
+Otherwise reuse compatible active Conda, then fall back to the project environment.
 This script does not connect devices or install LeRobot/training dependencies.
 
 Install the independent default V2.1 writer separately:
@@ -26,7 +27,8 @@ if ! command -v uv >/dev/null 2>&1; then
 fi
 
 DEFAULT_PYTHON="$ROOT/module/nrc/.venv/bin/python"
-TELEOP_PYTHON="${GELLO_CR_PYTHON:-${NRC_PYTHON:-${NRC_ENV:-$ROOT/module/nrc/.venv}/bin/python}}"
+source "$ROOT/scripts/teleop_python.sh"
+select_teleop_python "$ROOT"
 if [[ ! -x "$TELEOP_PYTHON" ]]; then
   if [[ "$TELEOP_PYTHON" != "$DEFAULT_PYTHON" ]]; then
     echo "ERROR: Selected Python environment is missing: $TELEOP_PYTHON" >&2

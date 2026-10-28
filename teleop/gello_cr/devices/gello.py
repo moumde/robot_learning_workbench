@@ -17,6 +17,7 @@ the GELLO package normally and set ``software_root=None``.
 
 from __future__ import annotations
 
+import logging
 import math
 import sys
 import threading
@@ -31,6 +32,23 @@ from teleop.gello_cr.core.contracts import JointState, MasterSnapshot
 RobotFactory = Callable[..., Any]
 
 _ARM_JOINT_NAMES = ("j1", "j2", "j3", "j4", "j5", "j6")
+
+
+def _require_gello_source(root: Path) -> None:
+    """Refuse mixed cached sources without replacing live device modules."""
+    package_root = root / "gello"
+    for name, module in tuple(sys.modules.items()):
+        if name != "gello" and not name.startswith("gello."):
+            continue
+        paths = ([module.__file__] if getattr(module, "__file__", None) else [])
+        paths.extend(getattr(module, "__path__", ()))
+        if not paths or any(
+            not Path(path).resolve().is_relative_to(package_root) for path in paths
+        ):
+            raise RuntimeError(
+                f"GELLO 源码来源冲突：{name} 已从 {', '.join(map(str, paths)) or '未知路径'} 加载；"
+                f"当前配置要求 {package_root}。请退出工作台并重新启动，避免混用已加载设备模块。"
+            )
 
 
 @dataclass(frozen=True, slots=True)
@@ -207,11 +225,13 @@ class GelloDevice:
             root = Path(self.config.software_root).expanduser().resolve()
             if not root.is_dir():
                 raise FileNotFoundError(f"GELLO software_root does not exist: {root}")
+            _require_gello_source(root)
             root_text = str(root)
-            if root_text not in sys.path:
-                # Transitional only.  Future packaging work will replace this with
-                # a normal installed dependency/vendor package.
-                sys.path.insert(0, root_text)
+            # A Conda/site-packages entry may precede a previously added root.
+            # Make an explicit source authoritative even when already present.
+            while root_text in sys.path:
+                sys.path.remove(root_text)
+            sys.path.insert(0, root_text)
 
         try:
             from gello.robots.dynamixel import DynamixelRobot
@@ -221,11 +241,19 @@ class GelloDevice:
                 "Install GELLO or configure gello.software_root."
             ) from exc
 
+        if self.config.software_root:
+            _require_gello_source(root)
+
         if not callable(getattr(DynamixelRobot, "get_joint_state_sample", None)):
             raise RuntimeError(
                 "GELLO SDK must expose get_joint_state_sample() with physical bus timestamps; "
                 "use the bundled vendor/gello SDK or update the configured software_root."
             )
+        logging.getLogger("workbench.hardware").info(
+            "GELLO source: %s; Python: %s",
+            getattr(sys.modules.get("gello.robots.dynamixel"), "__file__", "installed package"),
+            sys.executable,
+        )
         return DynamixelRobot
 
     def _run(self) -> None:

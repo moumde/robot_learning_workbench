@@ -35,10 +35,14 @@ GELLO 采样接口保留成功总线读数的 monotonic 时间戳，重复读取
 
 ## 安装与环境边界
 
-界面及硬件适配复用父项目 `module/nrc/.venv/` 的 Python 3.12。
+界面及硬件适配使用兼容的 Python 3.12，独立环境位于 `module/nrc/.venv/`。
 `run_teleop.sh` 和 `run_gello_replay.sh` 委托 `run_nrc.sh` 检查 Python ABI 并补充
 `LD_LIBRARY_PATH` 中的 Python 共享库目录。解释器优先级是
-`GELLO_CR_PYTHON`、`NRC_PYTHON`、`NRC_ENV/bin/python`、默认 NRC 环境。
+`GELLO_CR_PYTHON`、`NRC_PYTHON`、显式 `NRC_ENV/bin/python`、兼容的已激活 Conda、默认 NRC 环境。
+自动复用 Conda 前检查 CPython 3.12、NumPy `>=1.26,<2`、基础界面依赖、
+O6 的 `pymodbus==3.5.1` 和 D435 的 `pyrealsense2`；只导入库，不连接设备。
+不兼容时说明原因并使用独立环境，正常启动时可自动创建缺失的默认环境。
+显式指定的错误路径或不兼容解释器会报错，避免静默更换环境。
 
 ```bash
 ./scripts/setup_teleop_env.sh
@@ -55,18 +59,21 @@ GELLO 采样接口保留成功总线读数的 monotonic 时间戳，重复读取
 自动安装并重新检查。安装需要可用的包源和 `uv` 或该解释器的 `pip`，失败时停止启动并提示处理方法。
 `--check-only` 只检查配置，不安装或验证该 SDK。
 
-Writer 是独立子进程。默认格式是 `lerobot_v21`，由
-`module/gello_writers/v21/.venv/bin/python` 中的官方 `lerobot==0.3.3` 写出 V2.1。
+Writer 是独立子进程。默认格式是 `lerobot_v21`，使用官方 `lerobot==0.3.3` 写出 V2.1。
+配置仍指向项目默认路径时，优先检查已激活 Conda 中对应格式的 SDK；兼容则直接复用，
+不兼容则使用 `module/gello_writers/v21/.venv/bin/python`。Writer 同样要求 Python 3.12。
 这与父项目 OpenPI 锁定的 LeRobot 版本不同，不能用 `module/openpi/.venv` 替代。
 Writer 安装脚本使用 CPU PyTorch 和 Dataset 依赖，跳过 LeRobot 的训练、可视化和硬件依赖。
 运行 SDK API 检查仅证明接口可导入；首次使用新建环境前仍需执行实际写入、合并和恢复测试。
 
 HDF5 使用 NRC 环境中的 `h5py`，相应子进程与界面共享解释器文件，但仍独立运行。
 `dataset.worker_pythons` 分别指定 V2.1、V3 和 HDF5；缺少格式项时才回退到
-`dataset.worker_python`。`GELLO_CR_DATA_PYTHON` 只覆盖这个回退值；已配置的格式映射优先。
-若覆盖应用解释器后也要更换 HDF5 Writer，请同步修改 `worker_pythons.hdf5`。
+`dataset.worker_python`。`GELLO_CR_DATA_PYTHON` 覆盖启动时所选格式的实际映射；
+`GELLO_CR_V21_PYTHON`、`GELLO_CR_V3_PYTHON`、`GELLO_CR_HDF5_PYTHON` 可分别指定解释器，
+优先级高于通用变量。覆盖只在内存中生效，不改写配置文件。自定义解释器须通过相应格式检查。
+启动日志显示遥操解释器，连接日志显示 GELLO 源码路径，采集准备日志显示 Writer 解释器。
 
-V3 是可选格式，使用 `module/gello_writers/v3/.venv/`，必须与 V2.1 分离。
+V3 是可选格式，可复用接口兼容的 Conda，否则使用 `module/gello_writers/v3/.venv/`，必须与 V2.1 分离。
 其 SDK 需要 `RGBEncoderConfig` 和 `LeRobotDataset.create` 的 streaming encoder 参数。
 已有本地验证环境报告为 LeRobot 0.6.2 源码快照，来源没有 Git 元数据；它不能证明某个
 PyPI 发布版或固定上游 commit 兼容。因此安装 V3 时必须显式提供已验证的源码或固定 Git spec：

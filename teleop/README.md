@@ -17,6 +17,11 @@
 
 ## 日常使用
 
+可先激活已有 Conda，再运行启动脚本；程序检查兼容性后复用其中的包，
+不兼容时提示原因并使用项目独立环境。GELLO 控制代码使用 `vendor/gello`，
+底层 Dynamixel SDK 由选定 Python 环境提供，日志会显示实际路径。
+需要明确指定时，遥操使用 `GELLO_CR_PYTHON`，V2.1 写入使用 `GELLO_CR_V21_PYTHON`。
+
 ```bash
 ./scripts/run_teleop.sh
 ```

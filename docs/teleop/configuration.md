@@ -61,8 +61,9 @@
 
 | 环境变量 | 用途和优先级 |
 | --- | --- |
-| `GELLO_CR_PYTHON` / `NRC_PYTHON` / `NRC_ENV` | 父启动脚本依次选择应用解释器；缺省为 `module/nrc/.venv/bin/python`，要求 Python 3.12 |
-| `GELLO_CR_DATA_PYTHON` | 覆盖数据 Worker 的回退解释器；格式专属 `worker_pythons[format]` 优先。独立校验 CLI 使用调用它的解释器 |
+| `GELLO_CR_PYTHON` / `NRC_PYTHON` / `NRC_ENV` | 依次显式选择应用解释器；其后检查已激活 Conda 的兼容性，否则使用 `module/nrc/.venv/bin/python`。要求 CPython 3.12 |
+| `GELLO_CR_DATA_PYTHON` | 覆盖启动时所选数据格式的实际 Worker 映射。独立校验 CLI 使用调用它的解释器 |
+| `GELLO_CR_V21_PYTHON` / `GELLO_CR_V3_PYTHON` / `GELLO_CR_HDF5_PYTHON` | 分别指定对应格式的 Worker，优先于通用覆盖，不改写 JSON |
 | `GELLO_CR_OPENPI_ROOT` | 可选 DAgger 外部 OpenPI 根目录；只有显式启动集成时使用 |
 | `WORKBENCH_ROOT` / `GELLO_CR_REPO_ROOT` | 直接 `python -m teleop.gello_cr.ui` 时的仓库定位；`--repo-root` 优先，缺省从父源码定位 |
 | `GELLO_TEST_V21_PYTHON` / `GELLO_TEST_V3_PYTHON` | 仅官方格式离线回归的 Worker 环境，不是运行时配置 |

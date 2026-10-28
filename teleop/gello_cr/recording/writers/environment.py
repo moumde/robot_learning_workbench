@@ -5,6 +5,7 @@ import platform
 import shutil
 import signal
 import subprocess
+import sys
 from pathlib import Path
 
 from ..errors import WriterError
@@ -33,9 +34,12 @@ def _setup_help(format_name):
 
 
 def _probe_code(format_name):
+    version = "import sys\nassert sys.version_info[:2] == (3, 12), 'Writer requires Python 3.12'\n"
     if format_name == DatasetFormat.HDF5:
-        return "import h5py"
-    code = "from lerobot.datasets.lerobot_dataset import CODEBASE_VERSION, LeRobotDataset\n"
+        return version + "import h5py"
+    code = (
+        version + "from lerobot.datasets.lerobot_dataset import CODEBASE_VERSION, LeRobotDataset\n"
+    )
     if format_name == DatasetFormat.LEROBOT_V21:
         return code + "assert CODEBASE_VERSION == 'v2.1', 'Expected LeRobot V2.1 (lerobot==0.3.3)'"
     if format_name == DatasetFormat.LEROBOT_V3:
@@ -94,6 +98,44 @@ def prepare_writer_environment(
         stdin=subprocess.DEVNULL,
         check=False,
     )
+    # Only replace the repository defaults automatically. A custom configured
+    # interpreter is an explicit choice and must pass its own format checks.
+    default_for_format = {
+        DatasetFormat.LEROBOT_V21: default,
+        DatasetFormat.LEROBOT_V3: repo_root / "module/gello_writers/v3/.venv/bin/python",
+        DatasetFormat.HDF5: repo_root / "module/nrc/.venv/bin/python",
+    }.get(format_name)
+    candidates = []
+    # An explicitly selected Conda need not have been activated in the shell.
+    if (Path(sys.prefix) / "conda-meta").is_dir():
+        candidates.append(Path(os.path.abspath(sys.executable)))
+    if prefix := os.environ.get("CONDA_PREFIX"):
+        candidates.append(
+            Path(os.path.abspath(Path(prefix).expanduser()))
+            / ("python.exe" if platform.system() == "Windows" else "bin/python")
+        )
+    if python == default_for_format:
+        for candidate in dict.fromkeys(candidates):
+            if candidate == python or not candidate.is_file():
+                continue
+            try:
+                result = subprocess.run(
+                    [str(candidate), "-c", _probe_code(format_name)], timeout=60, **options
+                )
+            except (OSError, subprocess.TimeoutExpired) as exc:
+                reason = str(exc)
+            else:
+                if result.returncode == 0:
+                    if event_callback:
+                        event_callback(
+                            "info", f"Writer[{format_name}] 使用 Conda Python：{candidate}"
+                        )
+                    return str(candidate)
+                reason = result.stderr or result.stdout or f"exit={result.returncode}"
+            if event_callback:
+                event_callback(
+                    "warning", f"Conda 不兼容 {format_name}，改用独立环境：{python}\n{reason}"
+                )
     if not python.is_file():
         can_prepare = (
             allow_install
@@ -131,3 +173,6 @@ def prepare_writer_environment(
         raise WriterError(
             f"数据集 Writer SDK 不可用：\n{result.stdout}\n{result.stderr}\n{guidance}"
         )
+    if event_callback:
+        event_callback("info", f"Writer[{format_name}] Python：{python}")
+    return str(python)

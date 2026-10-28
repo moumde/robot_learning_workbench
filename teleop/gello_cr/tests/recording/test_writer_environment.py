@@ -53,7 +53,7 @@ def test_default_v21_is_prepared_before_success_is_reported(tmp_path, monkeypatc
 
     assert sum(command[-1] == "v21" for command in commands) == 1
     assert commands[1][0] == str(python)
-    assert len(events) == 2
+    assert sum("首次准备" in event[1] for event in events) == 1
     assert "CPU" in events[0][1]
 
 
