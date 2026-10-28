@@ -160,6 +160,8 @@ class CollectionPage(QWidget):
         self.episode_details_toggle.toggled.connect(self.episode_status.setVisible)
         self.dataset_setup_toggle.toggled.connect(self._show_dataset_setup)
         self.dagger_expander.toggled.connect(self._show_dagger)
+        self.create_dataset_button.hide()
+        self._show_dataset_setup(self.dataset_setup_toggle.isChecked())
 
     def _show_dataset_setup(self, visible):
         self.dataset_setup.setVisible(visible)

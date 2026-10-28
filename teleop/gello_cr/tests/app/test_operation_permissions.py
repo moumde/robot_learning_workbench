@@ -254,6 +254,23 @@ def test_recording_requires_explicit_matching_source(state, source, allowed):
         assert not calls
 
 
+@pytest.mark.parametrize("source,state", [("replay", WorkflowState.REPLAY_RUNNING), ("point_move", WorkflowState.POINT_MOVE_RUNNING)])
+def test_motion_capture_requires_prepared_dataset_and_live_source(source, state):
+    from teleop.gello_cr.app.permissions import OperationContext, operation_permission
+
+    def allowed(recorder, motion):
+        return operation_permission(
+            Command.START_EPISODE,
+            OperationContext(state, recorder=recorder, runtime={"motion": motion}),
+            {"source": source},
+        ).allowed
+
+    assert not allowed({}, {"running": True, "source": source.upper()})
+    assert not allowed({"session_active": True}, {"running": False, "source": source.upper()})
+    assert not allowed({"session_active": True}, {"running": True, "source": "HOME"})
+    assert allowed({"session_active": True}, {"running": True, "source": source.upper()})
+
+
 @pytest.mark.parametrize("outcome", ["success", "failure"])
 def test_finish_episode_stops_and_saves_on_one_command(outcome):
     episode = {"episode_active": True, "episode_pending": False, "buffered_frames": 3}
@@ -407,7 +424,9 @@ def test_recording_rechecks_live_source_readiness(
     }
     service = ApplicationService(state_machine=WorkflowStateMachine(state))
     service.set_permission_sources(readiness_snapshot=lambda: ready)
-    vm = build_application_view_model(service.snapshot(), {}, {}, ready)
+    dataset = {"session_active": True}
+    service.set_recording_snapshot(lambda: dataset)
+    vm = build_application_view_model(service.snapshot(), {}, dataset, ready)
     assert service.can(Command.START_EPISODE, {"source": source}) is allowed
     assert vm.recording_sources[source] is allowed
 

@@ -219,7 +219,8 @@ def test_ready_without_task_explains_setup_before_first_episode(collection):
 def test_dataset_setup_folds_once_per_session_and_keeps_operator_choice(collection):
     page, _ = collection
     render(page, WorkflowState.ROBOT_ENABLED, camera_frames_ready=True)
-    assert page.dataset_setup_toggle.isChecked()
+    assert not page.dataset_setup_toggle.isChecked()
+    assert page.dataset_setup.isHidden()
 
     render(page, WorkflowState.ROBOT_ENABLED, {"session_active": True}, camera_frames_ready=True)
     assert not page.dataset_setup_toggle.isChecked()
@@ -229,6 +230,38 @@ def test_dataset_setup_folds_once_per_session_and_keeps_operator_choice(collecti
     assert page.finalize_dataset_button.isEnabled()
     assert page.finalize_dataset_button.isVisibleTo(page)
     assert not page.root_edit.isEnabled()
+
+
+def test_default_recording_workflow_skips_manual_dataset_creation(collection):
+    page, _ = collection
+    page.task_edit.setText("motor_pick")
+    page.root_edit.setText("/data/captures")
+    render(
+        page,
+        WorkflowState.ROBOT_ENABLED,
+        master_connected=True,
+        o6_connected=True,
+        camera_frames_ready=True,
+    )
+
+    assert page.episode_start_button.isEnabled()
+    assert page.episode_start_button.text() == "开始记录"
+    assert "开始记录" in page.preparation_hint.text()
+    assert page.episode_start_button.property("role") == "primary"
+    assert page.start_teleop_button.property("role") == "quiet"
+    assert page.create_dataset_button.isHidden()
+    assert "/data/captures" in page.session_summary.text()
+    page.dataset_setup_toggle.click()
+    assert not page.dataset_setup.isHidden()
+    assert page.create_dataset_button.isHidden()
+    assert "自动创建" in page.name_preview.text()
+
+
+def test_return_home_hint_explains_recording_will_be_pending(collection):
+    page, _ = collection
+    render(page, WorkflowState.TELEOP_RUNNING, {"episode_active": True, "buffered_frames": 30})
+    assert "待保存" in page.return_home_button.toolTip()
+    assert "待保存" in page.episode_hint.text()
 
 
 def test_folded_session_keeps_current_task_and_output_identifiable(collection):
@@ -249,6 +282,23 @@ def test_folded_session_keeps_current_task_and_output_identifiable(collection):
     assert "motor_pick" in page.session_summary.text()
     assert "HDF5" in page.session_summary.text()
     assert page.session_summary.toolTip() == "/data/captures/motor_pick_batch"
+
+
+def test_recording_summary_shows_final_output_instead_of_staging_segment(collection):
+    page, _ = collection
+    render(
+        page,
+        WorkflowState.ROBOT_ENABLED,
+        {
+            "session_active": True,
+            "root": "/data/.staging/motor_pick/segment_000",
+            "output_root": "/data/captures/motor_pick",
+        },
+        camera_frames_ready=True,
+    )
+    assert "保存目录：/data/captures/motor_pick" in page.session_summary.text()
+    assert ".staging" not in page.session_summary.text()
+    assert page.session_summary.toolTip() == "/data/captures/motor_pick"
 
 
 @pytest.mark.parametrize("recording", [True, False], ids=["recording", "pending"])

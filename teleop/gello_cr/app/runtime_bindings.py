@@ -9,7 +9,7 @@ from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from typing import Any
 
-from teleop.gello_cr.core.state_machine import Command, InvalidTransition
+from teleop.gello_cr.core.state_machine import Command, InvalidTransition, WorkflowState
 from teleop.gello_cr.trajectory import ReplayMode, ReplayOptions
 
 from .background import BackgroundJobs
@@ -226,10 +226,16 @@ class RuntimeCommandBindings:
         metadata = payload.get("metadata")
         if metadata is not None and not isinstance(metadata, Mapping):
             raise TypeError("metadata must be a mapping")
+        self._require_permission(Command.START_EPISODE, payload)
+        if (
+            callable(getattr(self.recorder, "prepare_dataset", None))
+            and not self.recorder.snapshot().get("session_active")
+        ):
+            self._create_dataset(payload)
         wait_ready = getattr(self.teleop_engine, "wait_follow_ready", None)
         if payload.get("source", "teleop") == "teleop" and callable(wait_ready):
             wait_ready()
-            self._require_permission(Command.START_EPISODE, payload)
+        self._require_permission(Command.START_EPISODE, payload)
         return self.recorder.start_episode(
             task,
             base_root,
@@ -252,6 +258,16 @@ class RuntimeCommandBindings:
 
     def _create_dataset(self, payload):
         self._require_readiness(cameras=True)
+        prepare = getattr(self.recorder, "prepare_dataset", None)
+        if callable(prepare):
+            return prepare(
+                self._required_text(payload, "task"),
+                self._required_text(payload, "base_root"),
+                task_description=str(payload.get("description", "")),
+                allow_environment_setup=self.service.state in (
+                    WorkflowState.OFFLINE, WorkflowState.CONNECTED, WorkflowState.ROBOT_ENABLED,
+                ),
+            )
         return self.recorder.create_dataset(
             self._required_text(payload, "task"),
             self._required_text(payload, "base_root"),

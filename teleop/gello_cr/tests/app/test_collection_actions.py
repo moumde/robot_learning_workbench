@@ -22,6 +22,8 @@ class Recorder:
         self.frames = 0
         self.error = ""
         self.start_error = self.save_error = None
+        self.session_active = False
+        self.prepare_error = None
 
     def snapshot(self):
         return {
@@ -29,7 +31,14 @@ class Recorder:
             "episode_pending": not self.active and self.frames > 0,
             "buffered_frames": self.frames,
             "error": self.error,
+            "session_active": self.session_active,
         }
+
+    def create_dataset(self, task, base_root, **kwargs):
+        self.events.append("prepare_dataset")
+        if self.prepare_error:
+            raise self.prepare_error
+        self.session_active = True
 
     def start_episode(self, task, root, *, metadata=None):
         if self.start_error:
@@ -89,6 +98,9 @@ class Engine:
         self.state = "fault"
         self.stop_seen.set()
 
+    def stop_motion(self, reason):
+        self.stop_follow(reason)
+
 
 @pytest.fixture
 def setup():
@@ -122,7 +134,7 @@ def start(service):
 def test_start_collection_starts_follow_and_recording_with_one_intent(setup):
     service, engine, recorder, events, _ = setup
     start(service)
-    assert events == ["follow", "record"]
+    assert events == ["prepare_dataset", "follow", "record"]
     assert recorder.active and engine.state == "following"
     assert service.state is WorkflowState.TELEOP_RUNNING
 
@@ -132,7 +144,7 @@ def test_failed_recording_start_stops_the_follow_it_started(setup):
     recorder.start_error = OSError("dataset not writable")
     with pytest.raises(OSError, match="not writable"):
         start(service)
-    assert events == ["follow", "stop_follow"]
+    assert events == ["prepare_dataset", "follow", "stop_follow"]
     assert engine.state == "idle" and not recorder.active
     assert service.state is WorkflowState.ROBOT_ENABLED
 
@@ -143,8 +155,72 @@ def test_failed_recording_start_preserves_a_preexisting_manual_follow(setup):
     recorder.start_error = OSError("dataset not writable")
     with pytest.raises(OSError):
         start(service)
-    assert events == ["follow"]
+    assert events == ["follow", "prepare_dataset"]
     assert engine.state == "following"
+
+
+def test_writer_preparation_failure_never_starts_follow_or_episode(setup):
+    service, engine, recorder, events, _ = setup
+    recorder.prepare_error = FileNotFoundError("writer Python missing")
+    with pytest.raises(FileNotFoundError, match="writer Python"):
+        start(service)
+    assert events == ["prepare_dataset"]
+    assert engine.state == "idle" and not recorder.active
+    assert service.state is WorkflowState.ROBOT_ENABLED
+
+
+def test_next_episode_reuses_prepared_dataset(setup):
+    service, _, recorder, events, _ = setup
+    start(service)
+    service.dispatch(Command.FINISH_COLLECTION, {"outcome": "success"})
+    start(service)
+    assert events.count("prepare_dataset") == 1
+    assert recorder.active
+
+
+def test_stop_during_writer_preparation_prevents_late_follow(setup):
+    service, _, recorder, events, _ = setup
+    entered, release = threading.Event(), threading.Event()
+    errors = []
+    create = recorder.create_dataset
+
+    def delayed_create(*args, **kwargs):
+        entered.set()
+        assert release.wait(2)
+        return create(*args, **kwargs)
+
+    def collect():
+        try:
+            start(service)
+        except Exception as exc:
+            errors.append(exc)
+
+    recorder.create_dataset = delayed_create
+    worker = threading.Thread(target=collect)
+    worker.start()
+    try:
+        assert entered.wait(1)
+        service.dispatch(Command.STOP_MOTION)
+        release.set()
+        worker.join(2)
+        assert not worker.is_alive()
+        assert any(isinstance(exc, CommandSuperseded) for exc in errors)
+        assert "follow" not in events and not recorder.active
+    finally:
+        release.set()
+        worker.join(2)
+
+
+def test_return_home_stops_recording_and_keeps_frames_for_explicit_result(setup):
+    service, engine, recorder, events, _ = setup
+    start(service)
+    service.dispatch(Command.RETURN_HOME)
+    assert events[-2:] == ["home_arrived", "stop_record"]
+    assert not recorder.active and recorder.frames == 5
+    assert service.state is WorkflowState.ROBOT_ENABLED and engine.state == "idle"
+    assert "save_success" not in events
+    service.dispatch(Command.FINISH_COLLECTION, {"outcome": "success"})
+    assert recorder.frames == 0 and events[-1] == "save_success"
 
 
 @pytest.mark.parametrize(
@@ -375,7 +451,7 @@ def test_delayed_collection_stop_cannot_cancel_new_home(tmp_path):
         assert not home.is_alive() and not home_errors
         assert any(isinstance(error, CommandSuperseded) for error in finish_errors)
         assert service.state is WorkflowState.ROBOT_ENABLED
-        assert recorder.active and recorder.frames > 0
+        assert not recorder.active and recorder.frames > 0
     finally:
         release_stop.set()
         release_home.set()

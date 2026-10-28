@@ -1411,10 +1411,10 @@
                    <bool>true</bool>
                   </property>
                   <property name="checked">
-                   <bool>true</bool>
+                   <bool>false</bool>
                   </property>
                   <property name="arrowType">
-                   <enum>Qt::DownArrow</enum>
+                   <enum>Qt::RightArrow</enum>
                   </property>
                   <property name="toolButtonStyle">
                    <enum>Qt::ToolButtonTextBesideIcon</enum>
@@ -1888,7 +1888,7 @@
                     </sizepolicy>
                    </property>
                    <property name="text">
-                    <string>填写任务名称后创建数据集</string>
+                    <string>开始记录时自动创建数据集</string>
                    </property>
                    <property name="wordWrap">
                     <bool>true</bool>
@@ -2904,7 +2904,7 @@
            </sizepolicy>
           </property>
           <property name="text">
-           <string>开始采集</string>
+           <string>开始记录</string>
           </property>
          </widget>
         </item>
@@ -2914,7 +2914,7 @@
            <string>回 HOME</string>
           </property>
           <property name="toolTip">
-           <string>返回 HOME；当前 Episode 继续录制</string>
+           <string>返回 HOME；停止本段记录并保留待保存</string>
           </property>
           <property name="role" stdset="0">
            <string notr="true">quiet</string>

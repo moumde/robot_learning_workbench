@@ -108,12 +108,21 @@ class BatchManager:
             worker_pythons=self.writer_factory.worker_pythons,
         )
 
-    def create_dataset(self, task, base_root, *, task_description=""):
+    def prepare_dataset(self, task, base_root, *, task_description="", allow_environment_setup=False):
+        return self.create_dataset(
+            task, base_root, task_description=task_description,
+            allow_environment_setup=allow_environment_setup,
+        )
+
+    def create_dataset(self, task, base_root, *, task_description="", allow_environment_setup=False):
         if self._batch is not None:
             raise RecordingError("请先完成或保留当前批次，再创建新数据集")
         task = str(task).strip()
         if not task:
             raise ValueError("Dataset task text cannot be empty")
+        prepare = getattr(self.writer_factory, "prepare_environment", None)
+        if callable(prepare):
+            prepare(event_callback=self._event, allow_install=allow_environment_setup)
         config = self.writer_factory.config
         batch = BatchManifest(
             str(uuid4()),

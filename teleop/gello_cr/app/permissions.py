@@ -120,6 +120,14 @@ def operation_permission(command, context, payload=None):
         return deny("Episode 未处理；复位前请先保存失败或明确丢弃")
     if command is Command.START_EPISODE and RECORDING_SOURCES.get(source) is not state:
         return deny("请先启动所选采集来源：遥操、回放或精确走点")
+    if command is Command.START_EPISODE and source != "teleop":
+        if recorder is not None and not recorder.get("session_active"):
+            return deny("回放或走点采集请先创建数据集，再启动运动和记录")
+        motion = runtime.get("motion")
+        if motion is not None and (
+            not motion.get("running") or motion.get("source") != source.upper()
+        ):
+            return deny("所选采集运动已结束或被其他运动接管，请重新启动对应来源")
     if command is Command.FINISH_EPISODE:
         outcome = data.get("outcome")
         if outcome not in ("success", "failure"):

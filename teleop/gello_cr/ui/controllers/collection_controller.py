@@ -97,6 +97,7 @@ class CollectionController:
                 "正在处理上一项请求，请稍候。" if busy else view.action_reasons.get(command, "")
             )
         source = page.recording_source_combo.currentData() or "teleop"
+        page.create_dataset_button.setVisible(source != "teleop")
         source_allowed = view.recording_sources.get(
             source, view.actions.get(Command.START_EPISODE, False)
         )
@@ -111,14 +112,14 @@ class CollectionController:
             if resume_teleop
             else source_allowed and form_ready and not (recording or pending)
         )
-        page.episode_start_button.setText("重新开始遥操" if resume_teleop else "开始采集")
+        page.episode_start_button.setText("重新开始遥操" if resume_teleop else "开始记录")
         page.episode_start_button.setVisible(True)
         page.episode_start_button.setEnabled(start_allowed and not busy)
         supports_home = not readiness.robot_profile or readiness.capabilities.supports_home
         page.return_home_button.setVisible(supports_home)
         page.return_home_button.setEnabled(view.actions.get(Command.RETURN_HOME, False))
         home_reason = view.action_reasons.get(Command.RETURN_HOME, "")
-        page.return_home_button.setToolTip(home_reason or "返回 HOME；当前 Episode 继续录制")
+        page.return_home_button.setToolTip(home_reason or "返回 HOME；停止本段记录并保留待保存")
         page.episode_stop_button.setVisible(supports_home)
         page.episode_stop_button.setEnabled(
             recording and view.actions.get(Command.HOME_AND_SAVE_EPISODE, False) and not busy
@@ -168,7 +169,7 @@ class CollectionController:
         setup_context = bool(view.dataset_session_active or recording or pending)
         if setup_context != self._setup_context:
             self._setup_context = setup_context
-            page.dataset_setup_toggle.setChecked(not setup_context)
+            page.dataset_setup_toggle.setChecked(False)
         page.resume_dataset_button.setEnabled(
             not (recording or pending or busy or view.dataset_session_active)
         )
@@ -231,8 +232,15 @@ class CollectionController:
             hint, next_button = "下一步：连接机器人；相机可独立启动。", page.connect_button
         elif not enabled:
             hint, next_button = "下一步：确认机器人状态并明确上使能。", page.power_on_button
+        elif page.episode_start_button.isEnabled():
+            hint, next_button = (
+                "下一步：点击“开始记录”，自动准备数据集并同步遥操和录制。"
+                if page.recording_source_combo.currentData() == "teleop"
+                else "下一步：点击“开始记录”，录制当前运动来源。",
+                page.episode_start_button,
+            )
         elif teleop:
-            hint = "遥操运行中 · 确认任务、数据集和相机后开始 Recording。"
+            hint = "遥操运行中 · 确认相机画面和任务设置后点击“开始记录”。"
         elif view.motion_state.name in ("REPLAY", "POINT_MOVE", "HOME", "POLICY"):
             hint = "当前正在执行其他运动；回放或走点采集请明确选择对应来源，启用遥操前先停止运动。"
         elif not ready.devices_ready:
@@ -241,13 +249,14 @@ class CollectionController:
                 page.prepare_devices_button,
             )
         else:
-            hint, next_button = "下一步：启用遥操，建立主从跟随。", page.start_teleop_button
+            hint = "确认相机画面和任务设置后点击“开始记录”，同时启用遥操和录制。"
         page.preparation_hint.setText(hint)
         for button in (
             page.connect_button,
             page.prepare_devices_button,
             page.power_on_button,
             page.start_teleop_button,
+            page.episode_start_button,
         ):
             page._role(
                 button, "primary" if button is next_button and button.isEnabled() else "quiet"
@@ -279,10 +288,9 @@ class CollectionController:
             "lerobot_v21": "LeRobot V2.1",
             "hdf5": "HDF5",
         }.get(view.dataset_format, view.dataset_format)
-        page.session_summary.setText(f"{task} · {format_name}")
-        page.session_summary.setToolTip(
-            dataset.get("root") or dataset.get("output_root") or page.root_edit.text()
-        )
+        save_root = dataset.get("output_root") or dataset.get("root") or page.root_edit.text()
+        page.session_summary.setText(f"{task} · {format_name}\n保存目录：{save_root}")
+        page.session_summary.setToolTip(save_root)
         page.episode_id_label.setText(
             episode_label(dataset, active=view.episode_active or view.episode_pending)
         )
@@ -314,7 +322,7 @@ class CollectionController:
                 hint = "请选择成功或失败保存，或明确丢弃后继续。"
         elif view.episode_active:
             headline, severity = "● REC · 正在采集并写入批次", "success"
-            hint = "回 HOME 并成功保存，或直接选择成功保存、失败保存；独立回 HOME 后继续录制。"
+            hint = "回 HOME 后本段待保存，再选择成功或失败；也可直接保存，或回 HOME 并成功保存。"
         elif view.workflow_state in (WorkflowState.FAULT, WorkflowState.ESTOP):
             headline, hint, severity = (
                 "故障待处理",
@@ -331,8 +339,10 @@ class CollectionController:
             headline, hint = "设置本次采集任务", "填写任务名称和保存目录，或继续未完成批次。"
         else:
             headline, hint = (
-                "可以开始采集",
-                "开始采集后，回 HOME 并成功保存，或直接选择成功保存、失败保存。",
+                "可以开始记录",
+                "点击开始记录会自动创建数据集并启动遥操和录制；结束后选择成功或失败保存。"
+                if source == "teleop"
+                else "点击开始记录以录制当前运动来源，结束后选择成功或失败保存。",
             )
         if view.quality_needs_review:
             hint += " 本段采集质量需复核，展开采集详情查看。"
@@ -361,7 +371,14 @@ class CollectionController:
             text += "\nDataset validation: " + ("PASS" if report["valid"] else "FAILED")
             text += " · " + "; ".join(report.get("errors", ()))
         page.episode_status.setText(text)
-        page.name_preview.setText(dataset.get("dataset_name_preview", ""))
+        page.name_preview.setText(
+            dataset.get("dataset_name_preview")
+            or (
+                "开始记录时自动创建数据集，使用当前保存目录"
+                if source == "teleop"
+                else "运动开始前创建数据集，准备记录环境"
+            )
+        )
         receipt = dataset.get("last_saved")
         if receipt and receipt != self._last_receipt:
             self._last_receipt = dict(receipt)

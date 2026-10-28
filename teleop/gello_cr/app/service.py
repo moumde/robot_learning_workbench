@@ -242,27 +242,45 @@ class ApplicationService:
                 if self._preemption_generation == generation + 1:
                     self.report_external_fault(reason)
             raise
-        with self._lock:
-            if (
-                self._preemption_generation != generation
-                or self.state is not WorkflowState.RETURNING_HOME
-            ):
-                raise CommandSuperseded("HOME 回位被停止或故障中断")
-            state = self._state_machine.apply(Command.HOME_COMPLETED)
-            self._last_error = ""
-            self._emit_locked(
-                kind="home_arrived" if save_episode else "command_completed",
-                level=EventLevel.INFO,
-                message="机械臂已回 HOME，保持停止",
-                command=command,
-                details=data,
-            )
-        if save_episode:
-            with self._normal_dispatch_lock:
+        # Complete HOME and the take under the same normal-command lock, so a
+        # new collection cannot begin between arrival and stopping this take.
+        with self._normal_dispatch_lock:
+            with self._lock:
+                if (
+                    self._preemption_generation != generation
+                    or self.state is not WorkflowState.RETURNING_HOME
+                ):
+                    raise CommandSuperseded("HOME 回位被停止或故障中断")
+                state = self._state_machine.apply(Command.HOME_COMPLETED)
+                self._last_error = ""
+                self._emit_locked(
+                    kind="home_arrived",
+                    level=EventLevel.INFO,
+                    message="机械臂已回 HOME，保持停止",
+                    command=command,
+                    details=data,
+                )
+            if save_episode:
                 result = self._dispatch_collection_finish(
                     MappingProxyType({"outcome": "success"}), expected_generation=generation
                 )
-            return self._collection_completed(command, previous, result, data)
+                return self._collection_completed(command, previous, result, data)
+            # HOME leaves the frames pending for an explicit outcome choice.
+            with self._lock:
+                if self._preemption_generation != generation:
+                    raise CommandSuperseded("HOME 后的记录停止已被其他操作中断")
+                self._sync_recording()
+                recording = self._state_machine.recording_state is RecordingState.RECORDING
+            if recording:
+                self._dispatch_normal(Command.STOP_EPISODE, data, expected_generation=generation)
+            with self._lock:
+                if self._preemption_generation != generation:
+                    raise CommandSuperseded("HOME 完成已被其他操作中断")
+                self._emit_locked(
+                    kind="command_completed", level=EventLevel.INFO,
+                    message="机械臂已回 HOME；本段待选择保存结果" if recording else "机械臂已回 HOME，保持停止",
+                    command=command, details=data,
+                )
         return CommandResult(command, previous, state, value)
 
     def _collection_completed(self, command, previous, result, data):
@@ -289,6 +307,12 @@ class ApplicationService:
                 raise ValueError(f"{key} is required")
         if data.get("metadata") is not None and not isinstance(data["metadata"], Mapping):
             raise TypeError("metadata must be a mapping")
+        # Opening a worker can install/initialize the selected dataset SDK.
+        # Finish that work before creating a new motion producer, and reuse the
+        # open dataset for subsequent Episodes.
+        snapshot = self._recording_snapshot() if self._recording_snapshot else {}
+        if not snapshot.get("session_active"):
+            self._dispatch_normal(Command.CREATE_DATASET, data, expected_generation=generation)
         started_follow = previous is WorkflowState.ROBOT_ENABLED
         if started_follow:
             self._dispatch_normal(Command.START_TELEOP, data, expected_generation=generation)

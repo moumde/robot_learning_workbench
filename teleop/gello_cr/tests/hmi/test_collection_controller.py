@@ -64,7 +64,7 @@ def test_teleop_start_uses_collection_command_and_can_resume_active_episode(page
     widget.root_edit.setText("/data/captures")
     show(widget, {}, WorkflowState.ROBOT_ENABLED)
     assert widget.episode_start_button.isEnabled()
-    assert widget.episode_start_button.text() == "开始采集"
+    assert widget.episode_start_button.text() == "开始记录"
     assert widget.episode_start_button.toolTip() == "启动遥操并开始录制"
     widget.episode_start_button.click()
     assert requests[-1] == (
@@ -101,13 +101,33 @@ def test_explicit_motion_capture_uses_legacy_start_without_teleop(page, source, 
     widget, requests = page
     widget.task_edit.setText("pick")
     widget.root_edit.setText("/data/captures")
-    show(widget, {}, state)
+    show(widget, {"session_active": True}, state)
     assert not widget.episode_start_button.isEnabled()
     widget.recording_source_combo.setCurrentIndex(widget.recording_source_combo.findData(source))
     assert widget.episode_start_button.isEnabled()
+    assert "遥操" not in widget.preparation_hint.text()
     widget.episode_start_button.click()
     assert requests[-1][0] is Command.START_EPISODE
     assert requests[-1][1]["source"] == source
+
+
+@pytest.mark.parametrize("source", ["replay", "point_move"])
+def test_motion_sources_can_prepare_dataset_before_starting_motion(page, source):
+    widget, requests = page
+    widget.task_edit.setText("pick")
+    widget.root_edit.setText("/data/captures")
+    widget.recording_source_combo.setCurrentIndex(widget.recording_source_combo.findData(source))
+    show(widget, {}, WorkflowState.ROBOT_ENABLED)
+    widget.dataset_setup_toggle.click()
+    assert not widget.create_dataset_button.isHidden()
+    assert widget.create_dataset_button.isEnabled()
+    widget.create_dataset_button.click()
+    assert requests[-1] == (
+        Command.CREATE_DATASET,
+        {"task": "pick", "description": "", "base_root": "/data/captures"},
+    )
+    show(widget, {"session_active": True}, WorkflowState.ROBOT_ENABLED)
+    assert not widget.create_dataset_button.isEnabled()
 
 
 def test_recorder_clock_metrics_and_save_receipt_are_not_hidden_in_details(page):
