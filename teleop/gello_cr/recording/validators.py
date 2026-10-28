@@ -73,6 +73,7 @@ class HDF5Validator(CheckedValidator):
             report.episode_count = len(episodes)
             if "pending_episode" in file:
                 raise ValueError("Dataset contains an unfinished pending episode")
+            needs_review = []
             for name, episode in episodes.items():
                 times = episode["timestamp"][:]
                 count = len(times)
@@ -101,7 +102,14 @@ class HDF5Validator(CheckedValidator):
                     raise ValueError(f"Episode {name}: invalid result metadata")
                 if attrs["episode_index"] != int(name) or not attrs["task"].strip():
                     raise ValueError(f"Episode {name}: invalid index/task")
+                quality = json.loads(attrs.get("quality", "{}"))
+                if not isinstance(quality, dict):
+                    raise ValueError(f"Episode {name}: invalid quality metadata")
+                if quality.get("needs_review"):
+                    needs_review.append(int(name))
                 report.frame_count += count
+            if needs_review:
+                report.warnings.append(f"Episodes need review: {needs_review}")
 
 
 class LeRobotV21Validator(CheckedValidator):
@@ -133,6 +141,7 @@ class LeRobotV21Validator(CheckedValidator):
         fps = float(info["fps"])
         if not np.isfinite(fps) or fps <= 0:
             raise ValueError("Invalid FPS")
+        needs_review = []
         for ep in episodes:
             index = ep["episode_index"]
             values = {"episode_index": index, "episode_chunk": index // info["chunks_size"]}
@@ -167,6 +176,11 @@ class LeRobotV21Validator(CheckedValidator):
                 raise ValueError(f"Episode {index}: invalid capture timestamps")
             if sidecar["outcome"] not in ("success", "failure") or sidecar["frame_count"] != count:
                 raise ValueError(f"Episode {index}: invalid result metadata")
+            quality = sidecar.get("quality", {})
+            if not isinstance(quality, dict):
+                raise ValueError(f"Episode {index}: invalid quality metadata")
+            if quality.get("needs_review"):
+                needs_review.append(index)
             if any(tasks[r["task_index"]] != sidecar["task"] for r in rows):
                 raise ValueError(f"Episode {index}: task mismatch")
             for key in IMAGE_KEYS:
@@ -192,6 +206,8 @@ class LeRobotV21Validator(CheckedValidator):
             report.frame_count,
         ):
             raise ValueError("Dataset metadata counts differ from episode contents")
+        if needs_review:
+            report.warnings.append(f"Episodes need review: {needs_review}")
 
 
 def _jsonlines(path):

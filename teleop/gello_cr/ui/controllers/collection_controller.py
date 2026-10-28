@@ -369,7 +369,9 @@ class CollectionController:
         if view.dataset_validation:
             report = view.dataset_validation
             text += "\nDataset validation: " + ("PASS" if report["valid"] else "FAILED")
-            text += " · " + "; ".join(report.get("errors", ()))
+            details = list(report.get("errors", ())) + list(report.get("warnings", ()))
+            if details:
+                text += " · " + "; ".join(details)
         page.episode_status.setText(text)
         page.name_preview.setText(
             dataset.get("dataset_name_preview")
@@ -391,13 +393,20 @@ class CollectionController:
         set_state(page.save_receipt, "success")
         if not view.dataset_session_active and view.dataset_validation:
             report = view.dataset_validation
+            warnings = report.get("warnings", ())
+            errors = report.get("errors", ())
+            details = list(errors) + list(warnings)
             page.save_receipt.setVisible(True)
-            page.save_receipt.setText(
-                ("数据集已完成并发布" if report["valid"] else "数据集校验失败，尚未成功发布")
-                + "\n"
-                + str(dataset.get("root", ""))
+            headline = (
+                "数据集校验失败，尚未成功发布"
+                if not report["valid"]
+                else "数据集已完成并发布 · 质量需复核"
+                if warnings
+                else "数据集已完成并发布"
             )
-            set_state(page.save_receipt, "success" if report["valid"] else "error")
+            page.save_receipt.setText("\n".join([headline, str(dataset.get("root", "")), *details]))
+            state = "error" if not report["valid"] else "warning" if warnings else "success"
+            set_state(page.save_receipt, state)
 
     def _render_advanced(self, view, ready, busy):
         page = self.page
