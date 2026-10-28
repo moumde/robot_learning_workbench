@@ -1051,7 +1051,9 @@ _CONFIGS = [
             "gs://openpi-assets/checkpoints/pi05_base/params"
         ),
         # No freeze_filter: all model parameters are trainable (full fine-tuning).
-        batch_size=16,
+        # Disable EMA to avoid keeping a second full-sized parameter tree on one GPU.
+        ema_decay=None,
+        batch_size=32,
         lr_schedule=_optimizer.CosineDecaySchedule(
             warmup_steps=1_000,
             peak_lr=1e-5,
@@ -1060,9 +1062,9 @@ _CONFIGS = [
         ),
         optimizer=_optimizer.AdamW(clip_gradient_norm=1.0),
         log_interval=50,
-        save_interval=1_000,
+        save_interval=10_000,
         keep_period=5_000,
-        num_train_steps=30_000,
+        num_train_steps=50_000,
         wandb_enabled=False,
     ),
     #
