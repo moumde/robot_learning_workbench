@@ -167,15 +167,20 @@ class CR3O6CameraInterface:
             backend_name, camera_class, config_class = _load_lerobot_backend()
         else:
             backend_name, camera_class, config_class = camera_backend
-        if backend_name not in {"new", "old"}:
+        if backend_name not in {"new", "old", "native"}:
             raise ValueError(f"Unsupported camera backend name: {backend_name!r}")
         self.backend_name = backend_name
         self._camera_class = camera_class
         self._config_class = config_class
-        self._cameras = {
-            name: self._make_camera(name, self.camera_serials[name])
-            for name in CAMERA_NAMES
-        }
+        # Logical slots may share a physical device (for example a base ROI).
+        # Keep one backend and therefore one sampler for each physical serial.
+        physical = {}
+        self._cameras = {}
+        for name in CAMERA_NAMES:
+            serial = self.camera_serials[name]
+            if serial not in physical:
+                physical[serial] = self._make_camera(name, serial)
+            self._cameras[name] = physical[serial]
 
     @classmethod
     def from_config(cls, config_path: str | None = None, **overrides: Any):
@@ -194,7 +199,11 @@ class CR3O6CameraInterface:
 
     def _make_camera(self, name: str, serial_number: str) -> Any:
         del name
-        if self.backend_name == "new":
+        if self.backend_name == "native":
+            config = self._config_class(
+                serial=serial_number, fps=self.fps, width=self.width, height=self.height,
+            )
+        elif self.backend_name == "new":
             config = self._config_class(
                 serial_number_or_name=serial_number,
                 fps=self.fps,
@@ -216,7 +225,7 @@ class CR3O6CameraInterface:
 
     @property
     def cameras(self) -> Mapping[str, Any]:
-        """The underlying named LeRobot camera objects, exposed for diagnostics."""
+        """The underlying named camera backends, exposed for diagnostics."""
 
         return self._cameras
 
@@ -229,16 +238,21 @@ class CR3O6CameraInterface:
             for camera in self._cameras.values()
         )
 
-    def connect(self) -> "CR3O6CameraInterface":
+    def connect(self, timeout: float | None = None) -> "CR3O6CameraInterface":
         """Connect and warm up all cameras, cleaning up if any camera fails."""
 
         with self._lock:
             if self.connected:
                 return self
 
-            connected_names: list[str] = []
+            attempted = []
+            seen = set()
             try:
                 for name, camera in self._cameras.items():
+                    if id(camera) in seen:
+                        continue
+                    seen.add(id(camera))
+                    attempted.append((name, camera))
                     LOGGER.info(
                         "Connecting camera %s (serial=%s, %dx%d@%d)",
                         name,
@@ -247,11 +261,20 @@ class CR3O6CameraInterface:
                         self.height,
                         self.fps,
                     )
-                    camera.connect()
-                    connected_names.append(name)
+                    if self.backend_name == "native" and timeout is not None:
+                        camera.connect(timeout=timeout)
+                    else:
+                        camera.connect()
             except BaseException as exc:
-                for name in reversed(connected_names):
-                    self._safe_disconnect(self._cameras[name], name)
+                cleanup_errors = []
+                for attempted_name, camera in reversed(attempted):
+                    try:
+                        self._disconnect_camera(camera)
+                    except Exception as cleanup_error:
+                        cleanup_error.add_note(f"camera: {attempted_name}")
+                        cleanup_errors.append(cleanup_error)
+                if cleanup_errors:
+                    exc.add_note("Camera startup cleanup incomplete: " + repr(cleanup_errors))
                 raise CameraInterfaceError(
                     f"Failed to connect camera {name!r} "
                     f"(serial={self.camera_serials[name]}): {type(exc).__name__}: {exc}"
@@ -261,17 +284,45 @@ class CR3O6CameraInterface:
         return self
 
     @staticmethod
-    def _safe_disconnect(camera: Any, name: str) -> None:
-        try:
-            if bool(getattr(camera, "is_connected", False)):
-                camera.disconnect()
-        except Exception:
-            LOGGER.exception("Failed to disconnect camera %s", name)
+    def _disconnect_camera(camera: Any) -> None:
+        # Native devices retain partially opened resources after an unsuccessful
+        # start/close. Always allow their owner to retry cleanup.
+        if callable(getattr(camera, "latest_sample", None)) or bool(
+            getattr(camera, "is_connected", False)
+        ):
+            camera.disconnect()
+
+    @property
+    def error(self) -> str:
+        with self._lock:
+            for name, camera in self._cameras.items():
+                error = str(getattr(camera, "error", "") or "")
+                if error:
+                    return f"{name}: {error}"
+        return ""
+
+    def sample(self, name: str) -> Any:
+        """Read a cached timestamped sample without starting another sampler.
+
+        Only a backend that records a physical frame receipt may supply this
+        interface. Untimestamped LeRobot read caches are intentionally rejected.
+        """
+        with self._lock:
+            if not self.connected:
+                raise CameraInterfaceError("Cameras are disconnected; call connect() explicitly")
+            camera = self._cameras[name]
+            latest = getattr(camera, "latest_sample", None)
+            if not callable(latest):
+                raise CameraInterfaceError("Camera backend has no timestamped sample interface")
+            sample = latest()
+            if sample is None:
+                raise CameraInterfaceError(f"Camera {name!r} has no sampled RGB frame")
+            return sample
 
     def _async_read_camera(self, camera: Any) -> Any:
         """Read asynchronously across both supported LeRobot API versions."""
 
-        if self.backend_name == "new":
+        if self.backend_name in {"new", "native"}:
             return camera.async_read(timeout_ms=self.read_timeout_ms)
         # The older IntelRealSenseCamera starts its own reader thread and
         # exposes async_read() without a timeout_ms argument.
@@ -281,8 +332,19 @@ class CR3O6CameraInterface:
         """Disconnect all camera pipelines."""
 
         with self._lock:
+            errors = []
+            seen = set()
             for name, camera in reversed(tuple(self._cameras.items())):
-                self._safe_disconnect(camera, name)
+                if id(camera) in seen:
+                    continue
+                seen.add(id(camera))
+                try:
+                    self._disconnect_camera(camera)
+                except Exception as exc:
+                    exc.add_note(f"camera: {name}")
+                    errors.append(exc)
+            if errors:
+                raise ExceptionGroup("Camera shutdown incomplete", errors)
 
     close = disconnect
 

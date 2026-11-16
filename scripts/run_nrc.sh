@@ -33,7 +33,14 @@ if [[ -n "$NRC_PYTHON_LIBDIR" && -d "$NRC_PYTHON_LIBDIR" ]]; then
 fi
 
 export PYTHONPATH="$ROOT${PYTHONPATH:+:$PYTHONPATH}"
-export VIRTUAL_ENV="$NRC_ENV"
+# Keep environment metadata consistent with the executable we actually selected.
+# Conda has no pyvenv.cfg and must not inherit an unrelated virtualenv marker.
+NRC_SELECTED_PREFIX="$(cd "$NRC_BIN_DIR/.." && pwd)"
+if [[ -f "$NRC_SELECTED_PREFIX/pyvenv.cfg" ]]; then
+  export VIRTUAL_ENV="$NRC_SELECTED_PREFIX"
+else
+  unset VIRTUAL_ENV
+fi
 export PATH="$NRC_BIN_DIR:$PATH"
 cd "$ROOT"
 exec "$@"
